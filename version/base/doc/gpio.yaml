@@ -1,0 +1,2 @@
+# The written part of gpio: nothing but its bus. Registers, ports and the pad bundle are derived from pinout.yaml.
+bus: {type: slave}

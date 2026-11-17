@@ -1,0 +1,65 @@
+# The Hazard3 RISC-V core, 2-port (a separate instruction port and data port, both AHB-Lite masters). The core's RTL is
+# vendor code: the git submodule at version/base/rtl/core/hazard3 (pinned; vendor: below says where hw-proj finds it).
+# Which instructions it has is derived: isa_fixed: are always on, and each isa_params: letter is on when its parameter is not 0
+# (the instance's params: in system.yaml first, else the RTL default). The isa string is made once from them.
+kind: core
+reset_vector: RESET_VECTOR   # the parameter that holds the reset vector (with a boot.yaml hw-proj sets it)
+hart_id: {port: mhartid_val} # this input takes the hart index (0 for the first core)
+clock_in: [clk_always_on]    # this input takes the instance's clock
+isa_fixed: [i, zicsr]
+isa_params:
+  EXTENSION_M: m
+  EXTENSION_A: a
+  EXTENSION_C: c
+  EXTENSION_ZBA: zba
+  EXTENSION_ZBB: zbb
+  EXTENSION_ZBC: zbc
+  EXTENSION_ZBKB: zbkb
+  EXTENSION_ZBKX: zbkx
+  EXTENSION_ZBS: zbs
+  EXTENSION_ZCB: zcb
+  EXTENSION_ZCMP: zcmp
+  EXTENSION_ZIFENCEI: zifencei
+description: Hazard3 RV32IMC core, 2-port (separate instruction and data AHB-Lite masters)
+
+bus:
+  interfaces:
+    - {name: instruction, type: master, prefix: i_}
+    - {name: data,        type: master, prefix: d_}
+
+# No debug module and no JTAG: the core's debug, interrupt and power ports are inputs that nothing drives, so each takes a
+# default here (an input may have default: an integer). The partial entries are enough: the RTL gives direction and width.
+ports:
+  - {name: dbg_req_halt,           default: 0}
+  - {name: dbg_req_halt_on_reset,  default: 0}
+  - {name: dbg_req_resume,         default: 0}
+  - {name: dbg_data0_rdata,        default: 0}
+  - {name: dbg_instr_data,         default: 0}
+  - {name: dbg_instr_data_vld,     default: 0}
+  - {name: dbg_sbus_addr,          default: 0}
+  - {name: dbg_sbus_write,         default: 0}
+  - {name: dbg_sbus_size,          default: 0}
+  - {name: dbg_sbus_vld,           default: 0}
+  - {name: dbg_sbus_wdata,         default: 0}
+  - {name: pwrup_ack,              default: 1}   # no power controller: the core is always powered
+  - {name: fence_rdy,              default: 1}   # nothing to wait for on a fence
+  - {name: unblock_in,             default: 0}
+  - {name: eco_version,            default: 0}
+  - {name: irq,                    default: 0}   # no external interrupt sources in this chip
+  - {name: soft_irq,               default: 0}
+  - {name: timer_irq,              default: 0}
+
+vendor:
+  root: version/base/rtl/core/hazard3/hdl
+  extra_files:
+    - "arith/*.v"
+    - "hazard3_core.v"
+    - "hazard3_csr.v"
+    - "hazard3_decode.v"
+    - "hazard3_frontend.v"
+    - "hazard3_instr_decompress.v"
+    - "hazard3_irq_ctrl.v"
+    - "hazard3_pmp.v"
+    - "hazard3_power_ctrl.v"
+    - "hazard3_regfile_1w2r.v"
+    - "hazard3_triggers.v"

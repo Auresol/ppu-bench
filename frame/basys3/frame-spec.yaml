@@ -1,0 +1,8 @@
+# The Basys3 board (Digilent, XC7A35T): an FPGA frame. No board file: hw-proj generates the Vivado top from the xdc.
+# The shell makes the chip's clock (100 MHz oscillator -> the chip clock) and the reset.
+kind: fpga
+part: xc7a35tcpg236-1
+xdc: [frame/basys3/basys3.xdc]
+shell:
+  file: frame/basys3/basys3_shell.sv
+  module: basys3_shell

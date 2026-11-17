@@ -1,0 +1,2 @@
+# Full run: synthesis, place and route, and the bitstream.
+stop_at: bit

@@ -1,0 +1,14 @@
+# 62 pads: 48 software-driven, 14 the VGA connector's (a function of racer0, below). Which pad is which board port is the frame's wiring.yaml.
+#   pads 0..15: LEDs (the chip drives them)
+#   pads 16..31: switches (the chip reads them)
+#   pads 32..35: buttons (the chip reads them)
+#   pads 36..47: seven-segment display (the chip drives them)
+#   pads 48..61: VGA connector (the chip drives them)
+gpio: 62
+pads: none      # an FPGA board's pads have no settings: the pad bundle is pad_out, pad_oe, pad_in; CTRL<n> holds FUNCSEL alone
+
+# functions: a pin can be software (gpio OUT) or a function of an instance. racer0's signals take the connector's pads when firmware
+# writes FUNCSEL 1 into their CTRL registers (the first program does). rgb is 12 pads, rgb bit 0 on the first; red is the high bits.
+functions:
+  racer0:                         # FUNCSEL 1
+    - {rgb: [48, 59], hsync: 60, vsync: 61}

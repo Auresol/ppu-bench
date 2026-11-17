@@ -1,0 +1,3 @@
+[submodule "version/base/rtl/core/hazard3"]
+	path = version/base/rtl/core/hazard3
+	url = https://github.com/Wren6991/Hazard3

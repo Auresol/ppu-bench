@@ -1,0 +1,24 @@
+# racer0: the VGA output unit. The parent of the generated stream VGA block (doc/vga.yaml, guide/vga.md "Stream mode"), as in
+# ../vga_stream (hw-proj init's "VGA stream" example): its RTL (rtl/soc/racer.sv) instantiates `vga`, which holds no buffer.
+# It passes the raster position to the render unit (x, y, active, vblank, frame_start, lead pixels ahead of the beam) and takes
+# its colour back (pixel). Until the render unit starts (use_ppu = ppu0.engine_on) it shows its own colour bars: a monitor check
+# on the board with no firmware. No bus.
+kind: peripheral
+description: VGA output unit, 640x480@60 stream (no buffer); colour bars until the render unit starts, then its pixels
+ports:
+  - {name: x, dir: out, width: 10}
+  - {name: y, dir: out, width: 9}
+  - {name: active, dir: out, width: 1}
+  - {name: vblank, dir: out, width: 1}
+  - {name: frame_start, dir: out, width: 1}
+  - {name: pixel, dir: in, width: 12}                # the render unit's colour (ppu0)
+  - {name: use_ppu, dir: in, width: 1, default: 0}   # ppu0.engine_on: from the start of the render unit on, its colour
+  - {name: hsync, dir: out, width: 1}
+  - {name: vsync, dir: out, width: 1}
+  - {name: rgb, dir: out, width: 12}
+  - {name: pix_stb, dir: out, width: 1}
+# hsync, vsync and rgb are pad signals: functions: of pinout.yaml puts them on pins (rgb is a vector of 12)
+pad_signals:
+  hsync: {out: hsync}
+  vsync: {out: vsync}
+  rgb: {out: rgb}

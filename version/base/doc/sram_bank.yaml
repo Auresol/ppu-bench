@@ -1,0 +1,13 @@
+# A block of RAM on the bus that can hold a baked program. kind: memory + memory: sram says what it is; bus: {type: slave}
+# puts it on the bus. rtl/soc/memory/sram_bank.sv is hand-written and instantiates sram_bank_array, the storage: gen writes
+# that module and, for an FPGA, vivado-job fills it from FIRMWARE_MEM through the INIT_FILE parameter. The size of one
+# instance is set in system.yaml (params: DEPTH, in 4-byte words); the defaults here must equal the defaults in the RTL.
+kind: memory
+memory: sram
+wait: none      # hready is always 1: zero wait states
+description: AHB-Lite SRAM whose storage can start with a program (INIT_FILE)
+bus: {type: slave}
+params:
+  - {name: DEPTH, default: 2048}
+  - {name: WIDTH, default: 32}
+  - {name: INIT_FILE, default: 0}   # a string in the RTL (default ""); a memory with this parameter is a bank the firmware is loaded into (FIRMWARE_MEM)

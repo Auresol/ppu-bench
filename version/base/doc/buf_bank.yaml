@@ -1,0 +1,8 @@
+# A RAM bank on the bus that is NOT firmware RAM (no memory: sram, so the link scripts never put code, data or a stack in it):
+# the sprite table oam0 and the line lists lst0. Same AHB-Lite side and timing as sram_bank, the storage is an inferred RAM in its own RTL.
+kind: peripheral
+description: Zero-wait AHB-Lite RAM bank for render data (sprite table, line lists), outside the firmware RAM
+wait: none
+bus: {type: slave}
+params:
+  - {name: DEPTH, default: 256}

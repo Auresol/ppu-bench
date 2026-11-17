@@ -1,0 +1,70 @@
+# Chip GPIO pad -> Basys3 board port (a port of Basys-3-Master.xdc). Pad numbers follow the parts you picked:
+# LEDs, switches, buttons, the seven-segment display, then the VGA connector. A pad you leave out of wiring: reads 0.
+wiring:
+  0: led[0]
+  1: led[1]
+  2: led[2]
+  3: led[3]
+  4: led[4]
+  5: led[5]
+  6: led[6]
+  7: led[7]
+  8: led[8]
+  9: led[9]
+  10: led[10]
+  11: led[11]
+  12: led[12]
+  13: led[13]
+  14: led[14]
+  15: led[15]
+  16: sw[0]
+  17: sw[1]
+  18: sw[2]
+  19: sw[3]
+  20: sw[4]
+  21: sw[5]
+  22: sw[6]
+  23: sw[7]
+  24: sw[8]
+  25: sw[9]
+  26: sw[10]
+  27: sw[11]
+  28: sw[12]
+  29: sw[13]
+  30: sw[14]
+  31: sw[15]
+  32: btnU
+  33: btnL
+  34: btnR
+  35: btnD
+  36: seg[0]
+  37: seg[1]
+  38: seg[2]
+  39: seg[3]
+  40: seg[4]
+  41: seg[5]
+  42: seg[6]
+  43: dp
+  44: an[0]
+  45: an[1]
+  46: an[2]
+  47: an[3]
+  48: vgaBlue[0]
+  49: vgaBlue[1]
+  50: vgaBlue[2]
+  51: vgaBlue[3]
+  52: vgaGreen[0]
+  53: vgaGreen[1]
+  54: vgaGreen[2]
+  55: vgaGreen[3]
+  56: vgaRed[0]
+  57: vgaRed[1]
+  58: vgaRed[2]
+  59: vgaRed[3]
+  60: Hsync
+  61: Vsync
+
+# named: the chip's named pins (clocks: and reset: in system.yaml), driven by outputs of the shell
+named:
+  clk: shell.sys_clk      # the clock pin: the shell divides the 100 MHz oscillator to 100 MHz
+  porb: shell.por_n       # active low, synchronised to sys_clk, held while the MMCM is unlocked or the centre button is down

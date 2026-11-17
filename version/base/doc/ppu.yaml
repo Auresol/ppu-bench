@@ -1,0 +1,54 @@
+# The render unit (spec/sprite-spec.md): races the beam, no line buffer and no frame buffer.
+# - oam: a master on bus main. Reads the sprite table from oam0 and writes/reads the per-line sprite lists in lst0.
+# - tex: a master on bus tex. Reads textures and the palette from tex0.
+# - cfg: a slave on bus main. The registers below.
+# It streams into the VGA output unit racer0 (doc/racer.yaml): racer0 names the pixel it needs, ppu0 puts its colour on `pixel`.
+kind: peripheral
+description: Sprite render unit that races the beam, master on the main and texture buses, streams pixels into racer0
+bus:
+  interfaces:
+    - {name: cfg, type: slave, prefix: s_}
+    - {name: oam, type: master, prefix: a_}
+    - {name: tex, type: master, prefix: b_}
+params:
+  - {name: SLOTS, default: 8}   # sprite slots: how many sprites may cover one pixel (the main knob of the benchmark versions)
+ports:
+  # the stream from and to racer0 (doc/racer.yaml): the pixel racer0 needs, lead pixels ahead of the beam, and its colour
+  - {name: x, dir: in, width: 10}
+  - {name: y, dir: in, width: 9}
+  - {name: active, dir: in, width: 1}
+  - {name: vblank, dir: in, width: 1}
+  - {name: frame_start, dir: in, width: 1}
+  - {name: pix_stb, dir: in, width: 1}
+  - {name: pixel, dir: out, width: 12}
+  - {name: engine_on, dir: out, width: 1}   # high from CTRL.START on: the texture SRAM is read-only (texld0.lock)
+registers:
+  - name: CTRL
+    offset: 0x000
+    reset: 0x00000000
+    fields:
+      - {name: START, bits: [0], access: wf, desc: "write 1: render one frame from the next frame start; textures are locked from then on"}
+  - name: STATUS
+    offset: 0x004
+    reset: 0x00000000
+    fields:
+      - {name: DONE, bits: [0], access: ro, desc: "the frame is complete (its last line, sy = 479, is out)"}
+      - {name: BUSY, bits: [1], access: ro, desc: "started and not done"}
+  - name: LATE
+    offset: 0x008
+    reset: 0x00000000
+    fields:
+      - {name: COUNT, bits: [31, 0], access: ro, desc: "pixels not ready in time (shown black), saturating; nonzero means the frame is wrong"}
+  - name: GIANT
+    offset: 0x00C
+    reset: 0x00000000
+    fields:
+      - {name: W, bits: [9, 0], access: rw, desc: "giant sprite texture width in pixels, a multiple of 8"}
+      - {name: H, bits: [19, 10], access: rw, desc: "giant sprite texture height in pixels, a multiple of 8"}
+      - {name: SCALE2, bits: [20], access: rw, desc: "1: each texel is 2 x 2 screen pixels"}
+  - name: HIT%s
+    dim: 4
+    offset: 0x010
+    reset: 0x00000000
+    fields:
+      - {name: BITS, bits: [31, 0], access: ro, desc: "hit bit of sprites 32n .. 32n+31 (spec section 7)"}

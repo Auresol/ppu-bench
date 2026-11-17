@@ -1,0 +1,2 @@
+# Synthesis only: Vivado up to the synthesis checkpoint and reports (no place and route, no bitstream).
+stop_at: synth
