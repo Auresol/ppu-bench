@@ -34,6 +34,7 @@ VERSIONS = {
     "tex64": tex(64),
     "tex128": tex(128),
     "slots24-tex64": {**slots(24), **tex(64)},
+    "slots24-tex128": {**slots(24), **tex(128)},
 }
 
 
