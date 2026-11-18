@@ -45,17 +45,21 @@ func (t *T) Bandwidth8bpp(u *gen.PpuBench) { oneFrame(u, "bandwidth_8bpp") }
 func (t *T) BusyScreen(u *gen.PpuBench)    { oneFrame(u, "busy_screen") }
 
 // sweep: the depth and bandwidth ladders (model/workloads.py)
-func (t *T) Depth4(u *gen.PpuBench)  { oneFrame(u, "depth_4") }
-func (t *T) Depth8(u *gen.PpuBench)  { oneFrame(u, "depth_8") }
-func (t *T) Depth12(u *gen.PpuBench) { oneFrame(u, "depth_12") }
-func (t *T) Depth16(u *gen.PpuBench) { oneFrame(u, "depth_16") }
-func (t *T) Depth20(u *gen.PpuBench) { oneFrame(u, "depth_20") }
-func (t *T) Depth24(u *gen.PpuBench) { oneFrame(u, "depth_24") }
-func (t *T) Bw2(u *gen.PpuBench)     { oneFrame(u, "bw_2") }
-func (t *T) Bw4(u *gen.PpuBench)     { oneFrame(u, "bw_4") }
-func (t *T) Bw6(u *gen.PpuBench)     { oneFrame(u, "bw_6") }
-func (t *T) Bw8(u *gen.PpuBench)     { oneFrame(u, "bw_8") }
-func (t *T) Bw10(u *gen.PpuBench)    { oneFrame(u, "bw_10") }
+func (t *T) Depth4(u *gen.PpuBench)   { oneFrame(u, "depth_4") }
+func (t *T) Depth8(u *gen.PpuBench)   { oneFrame(u, "depth_8") }
+func (t *T) Depth12(u *gen.PpuBench)  { oneFrame(u, "depth_12") }
+func (t *T) Depth16(u *gen.PpuBench)  { oneFrame(u, "depth_16") }
+func (t *T) Depth20(u *gen.PpuBench)  { oneFrame(u, "depth_20") }
+func (t *T) Depth24(u *gen.PpuBench)  { oneFrame(u, "depth_24") }
+func (t *T) Bw2(u *gen.PpuBench)      { oneFrame(u, "bw_2") }
+func (t *T) Bw4(u *gen.PpuBench)      { oneFrame(u, "bw_4") }
+func (t *T) Bw6(u *gen.PpuBench)      { oneFrame(u, "bw_6") }
+func (t *T) Bw8(u *gen.PpuBench)      { oneFrame(u, "bw_8") }
+func (t *T) Bw10(u *gen.PpuBench)     { oneFrame(u, "bw_10") }
+func (t *T) Admit32(u *gen.PpuBench)  { oneFrame(u, "admit_32") }
+func (t *T) Admit64(u *gen.PpuBench)  { oneFrame(u, "admit_64") }
+func (t *T) Admit96(u *gen.PpuBench)  { oneFrame(u, "admit_96") }
+func (t *T) Admit120(u *gen.PpuBench) { oneFrame(u, "admit_120") }
 
 // The raster of the stream VGA block (guide/vga.md): 640x480@60 in 800 x 525, 2 chip cycles a pixel at 50 MHz (system.yaml).
 const (

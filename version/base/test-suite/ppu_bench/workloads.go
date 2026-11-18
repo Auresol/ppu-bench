@@ -12,6 +12,7 @@
 //	bandwidth_8bpp  6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels each
 //	busy_screen     all 128 sprites: the background and 127 random ones (seed fixed)
 //	depth_N, bw_N   the ladders (category bench): N deep (N-1 stacked 32x32 4bpp), N overlapping 64x64 8bpp
+//	admit_N         the admission ladder (bench): N 8x8 sprites spread along one line band, 2 deep, light on bandwidth
 package ppubench
 
 import (
@@ -353,6 +354,29 @@ func (x *xorshift) n(k int) int {
 
 var depthSteps = []int{4, 8, 12, 16, 20, 24}
 var bwSteps = []int{2, 4, 6, 8, 10}
+var admitSteps = []int{32, 64, 96, 120}
+
+// admitN: N 8x8 4bpp sprites spread evenly along the same 8 lines (one every 640/N pixels), over the background. Depth stays
+// about 2 and bandwidth about 10 bits a pixel, so the only thing that grows is how many sprites admission must load into slots
+// within one line: about 9 bus-main cycles each, against 2 cycles a pixel of beam.
+func admitN(n int) func() *workload {
+	return func() *workload {
+		wl := newWorkload(fmt.Sprintf("admit_%d", n), fmt.Sprintf("%d 8x8 sprites spread along one line band: admission rate", n))
+		stdPalette(wl)
+		bgTex := background(wl)
+		tile := wl.texture(8, 8, false, func(u, v int) int {
+			if (u == 0 || u == 7) && (v == 0 || v == 7) {
+				return 0
+			}
+			return 1 + (u+v)%3
+		})
+		for i := 0; i < n; i++ {
+			wl.sprite(tile, i*632/n, 236, spr{pal: 1 + i%3})
+		}
+		bg(wl, bgTex)
+		return wl
+	}
+}
 
 func depthN(n int) func() *workload {
 	return func() *workload {
@@ -393,6 +417,9 @@ var workloads = func() map[string]func() *workload {
 	}
 	for _, n := range bwSteps {
 		m[fmt.Sprintf("bw_%d", n)] = bwN(n)
+	}
+	for _, n := range admitSteps {
+		m[fmt.Sprintf("admit_%d", n)] = admitN(n)
 	}
 	return m
 }()

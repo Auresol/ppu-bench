@@ -99,3 +99,7 @@ tests:
     bw_6: {desc: "6 overlapping 64x64 8bpp sprites over the background"}
     bw_8: {desc: "8 overlapping 64x64 8bpp sprites over the background"}
     bw_10: {desc: "10 overlapping 64x64 8bpp sprites over the background"}
+    admit_32: {desc: "32 8x8 sprites spread along one line band: admission rate"}
+    admit_64: {desc: "64 8x8 sprites spread along one line band: admission rate"}
+    admit_96: {desc: "96 8x8 sprites spread along one line band: admission rate"}
+    admit_120: {desc: "120 8x8 sprites spread along one line band: admission rate"}

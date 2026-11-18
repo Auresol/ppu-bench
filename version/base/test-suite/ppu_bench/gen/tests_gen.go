@@ -12,6 +12,14 @@ import (
 
 // PpuBenchTests is every test doc/ppu_bench.yaml declares; your type implements it.
 type PpuBenchTests interface {
+	// bench/admit_120: 120 8x8 sprites spread along one line band: admission rate
+	Admit120(u *PpuBench)
+	// bench/admit_32: 32 8x8 sprites spread along one line band: admission rate
+	Admit32(u *PpuBench)
+	// bench/admit_64: 64 8x8 sprites spread along one line band: admission rate
+	Admit64(u *PpuBench)
+	// bench/admit_96: 96 8x8 sprites spread along one line band: admission rate
+	Admit96(u *PpuBench)
 	// bench/bw_10: 10 overlapping 64x64 8bpp sprites over the background
 	Bw10(u *PpuBench)
 	// bench/bw_2: 2 overlapping 64x64 8bpp sprites over the background
@@ -56,6 +64,14 @@ type PpuBenchTests interface {
 // in your type and override the tests you write.
 type PpuBenchDefaults struct{}
 
+func (PpuBenchDefaults) Admit120(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Admit32(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Admit64(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Admit96(u *PpuBench) { u.Sim.NotWritten() }
+
 func (PpuBenchDefaults) Bw10(u *PpuBench) { u.Sim.NotWritten() }
 
 func (PpuBenchDefaults) Bw2(u *PpuBench) { u.Sim.NotWritten() }
@@ -99,6 +115,14 @@ func (PpuBenchDefaults) Stack7(u *PpuBench) { u.Sim.NotWritten() }
 // it declares them (tb.Declare, Sim.Script) and returns what the cases need. Every case gets the result.
 type PpuBenchEnvTests[E any] interface {
 	Env(u *PpuBench) *E
+	// bench/admit_120: 120 8x8 sprites spread along one line band: admission rate
+	Admit120(u *PpuBench, e *E)
+	// bench/admit_32: 32 8x8 sprites spread along one line band: admission rate
+	Admit32(u *PpuBench, e *E)
+	// bench/admit_64: 64 8x8 sprites spread along one line band: admission rate
+	Admit64(u *PpuBench, e *E)
+	// bench/admit_96: 96 8x8 sprites spread along one line band: admission rate
+	Admit96(u *PpuBench, e *E)
 	// bench/bw_10: 10 overlapping 64x64 8bpp sprites over the background
 	Bw10(u *PpuBench, e *E)
 	// bench/bw_2: 2 overlapping 64x64 8bpp sprites over the background
@@ -142,6 +166,14 @@ type PpuBenchEnvTests[E any] interface {
 // PpuBenchEnvDefaults is PpuBenchDefaults for a module with an Env: embed PpuBenchEnvDefaults[Env].
 type PpuBenchEnvDefaults[E any] struct{}
 
+func (PpuBenchEnvDefaults[E]) Admit120(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Admit32(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Admit64(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Admit96(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
 func (PpuBenchEnvDefaults[E]) Bw10(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
 func (PpuBenchEnvDefaults[E]) Bw2(u *PpuBench, _ *E) { u.Sim.NotWritten() }
@@ -181,11 +213,31 @@ func (PpuBenchEnvDefaults[E]) Stack16(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 func (PpuBenchEnvDefaults[E]) Stack7(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
 // Methods are the Go names of the declared tests, for run.Orphans.
-var Methods = []string{"Bw10", "Bw2", "Bw4", "Bw6", "Bw8", "Depth12", "Depth16", "Depth20", "Depth24", "Depth4", "Depth8", "EmptyBlack", "SpritesBasic", "Bandwidth8bpp", "BusyScreen", "LineStorm", "Sparse", "Stack16", "Stack7"}
+var Methods = []string{"Admit120", "Admit32", "Admit64", "Admit96", "Bw10", "Bw2", "Bw4", "Bw6", "Bw8", "Depth12", "Depth16", "Depth20", "Depth24", "Depth4", "Depth8", "EmptyBlack", "SpritesBasic", "Bandwidth8bpp", "BusyScreen", "LineStorm", "Sparse", "Stack16", "Stack7"}
 
 // Cases are the declared tests, each on a fresh model, reset first.
 func Cases(t PpuBenchTests) []run.Case {
 	return []run.Case{
+		{Name: "admit_120", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Admit120(u)
+		}},
+		{Name: "admit_32", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Admit32(u)
+		}},
+		{Name: "admit_64", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Admit64(u)
+		}},
+		{Name: "admit_96", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Admit96(u)
+		}},
 		{Name: "bw_10", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
 			u := Bind(s)
 			u.Reset()
@@ -287,6 +339,30 @@ func Cases(t PpuBenchTests) []run.Case {
 // EnvCases are Cases for a module with an Env: each case binds a fresh model, calls Env, resets and calls the test with what Env made.
 func EnvCases[E any](t PpuBenchEnvTests[E]) []run.Case {
 	return []run.Case{
+		{Name: "admit_120", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Admit120(u, e)
+		}},
+		{Name: "admit_32", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Admit32(u, e)
+		}},
+		{Name: "admit_64", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Admit64(u, e)
+		}},
+		{Name: "admit_96", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Admit96(u, e)
+		}},
 		{Name: "bw_10", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
 			u := Bind(s)
 			e := t.Env(u)
