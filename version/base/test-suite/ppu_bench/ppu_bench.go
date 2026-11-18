@@ -107,13 +107,18 @@ type perf struct {
 }
 
 func oneFrame(u *gen.PpuBench, name string) {
-	s := u.Sim
-	root := repoRoot(s)
 	mk, ok := workloads[name]
 	if !ok {
-		s.Fatalf("no workload %q in workloads.go", name)
+		u.Sim.Fatalf("no workload %q in workloads.go", name)
 	}
-	wl := mk()
+	runFrame(u, mk(), name)
+}
+
+// runFrame renders one frame of wl and checks it (oneFrame for a named workload, RandomScene for a drawn one); name is
+// for the messages and the folder of the pictures.
+func runFrame(u *gen.PpuBench, wl *workload, name string) {
+	s := u.Sim
+	root := repoRoot(s)
 	image := wl.texBytes()
 	want, err := render(wl.oam, wl.giant, image)
 	if err != nil {

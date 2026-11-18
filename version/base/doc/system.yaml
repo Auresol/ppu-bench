@@ -85,6 +85,10 @@ tests:
     bandwidth_8bpp: {desc: "6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels per sprite"}
     busy_screen:    {desc: "all 128 sprites: background and 127 random ones"}
     pile_96:        {desc: "96 8x8 sprites on one spot at the top left: far more than the slots, all but one hidden"}
+  # random: a whole scene drawn per seed (test-suite/ppu_bench/random.go): 16 to 127 sprites of every kind, anywhere on the
+  # screen. A failing seed's report gives the replay: hw-proj test run ppu_bench --run 'random_scene#<i>'
+  random:
+    random_scene:   {desc: "a random scene per seed: 16-127 sprites of every kind anywhere on the screen", seeds: 16}
   # bench: ladders of one knob each (test-suite/ppu_bench/workloads.go); a version's capacity is the last step it passes (rtl-stat-job metrics). The category bench
   # is hw-proj's for tests about cost (guide/testbench-bench.md): rtl-stat-job submit --bench runs them alone, with profiles.
   bench:

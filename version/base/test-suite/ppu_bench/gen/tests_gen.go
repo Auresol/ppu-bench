@@ -46,6 +46,8 @@ type PpuBenchTests interface {
 	EmptyBlack(u *PpuBench)
 	// frame/sprites_basic: a scaled giant background, overlapping 4bpp and 8bpp sprites, flips, off-screen edges and hitboxes
 	SpritesBasic(u *PpuBench)
+	// random/random_scene: a random scene per seed: 16-127 sprites of every kind anywhere on the screen
+	RandomScene(u *PpuBench)
 	// stress/bandwidth_8bpp: 6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels per sprite
 	Bandwidth8bpp(u *PpuBench)
 	// stress/busy_screen: all 128 sprites: background and 127 random ones
@@ -100,6 +102,8 @@ func (PpuBenchDefaults) EmptyBlack(u *PpuBench) { u.Sim.NotWritten() }
 
 func (PpuBenchDefaults) SpritesBasic(u *PpuBench) { u.Sim.NotWritten() }
 
+func (PpuBenchDefaults) RandomScene(u *PpuBench) { u.Sim.NotWritten() }
+
 func (PpuBenchDefaults) Bandwidth8bpp(u *PpuBench) { u.Sim.NotWritten() }
 
 func (PpuBenchDefaults) BusyScreen(u *PpuBench) { u.Sim.NotWritten() }
@@ -153,6 +157,8 @@ type PpuBenchEnvTests[E any] interface {
 	EmptyBlack(u *PpuBench, e *E)
 	// frame/sprites_basic: a scaled giant background, overlapping 4bpp and 8bpp sprites, flips, off-screen edges and hitboxes
 	SpritesBasic(u *PpuBench, e *E)
+	// random/random_scene: a random scene per seed: 16-127 sprites of every kind anywhere on the screen
+	RandomScene(u *PpuBench, e *E)
 	// stress/bandwidth_8bpp: 6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels per sprite
 	Bandwidth8bpp(u *PpuBench, e *E)
 	// stress/busy_screen: all 128 sprites: background and 127 random ones
@@ -206,6 +212,8 @@ func (PpuBenchEnvDefaults[E]) EmptyBlack(u *PpuBench, _ *E) { u.Sim.NotWritten()
 
 func (PpuBenchEnvDefaults[E]) SpritesBasic(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
+func (PpuBenchEnvDefaults[E]) RandomScene(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
 func (PpuBenchEnvDefaults[E]) Bandwidth8bpp(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
 func (PpuBenchEnvDefaults[E]) BusyScreen(u *PpuBench, _ *E) { u.Sim.NotWritten() }
@@ -221,7 +229,7 @@ func (PpuBenchEnvDefaults[E]) Stack16(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 func (PpuBenchEnvDefaults[E]) Stack7(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
 // Methods are the Go names of the declared tests, for run.Orphans.
-var Methods = []string{"Admit120", "Admit32", "Admit64", "Admit96", "Bw10", "Bw2", "Bw4", "Bw6", "Bw8", "Depth12", "Depth16", "Depth20", "Depth24", "Depth4", "Depth8", "EmptyBlack", "SpritesBasic", "Bandwidth8bpp", "BusyScreen", "LineStorm", "Pile96", "Sparse", "Stack16", "Stack7"}
+var Methods = []string{"Admit120", "Admit32", "Admit64", "Admit96", "Bw10", "Bw2", "Bw4", "Bw6", "Bw8", "Depth12", "Depth16", "Depth20", "Depth24", "Depth4", "Depth8", "EmptyBlack", "SpritesBasic", "RandomScene", "Bandwidth8bpp", "BusyScreen", "LineStorm", "Pile96", "Sparse", "Stack16", "Stack7"}
 
 // Cases are the declared tests, each on a fresh model, reset first.
 func Cases(t PpuBenchTests) []run.Case {
@@ -310,6 +318,11 @@ func Cases(t PpuBenchTests) []run.Case {
 			u := Bind(s)
 			u.Reset()
 			t.SpritesBasic(u)
+		}},
+		{Name: "random_scene", Category: "random", Seeds: 16, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.RandomScene(u)
 		}},
 		{Name: "bandwidth_8bpp", Category: "stress", Body: func(s *tb.Sim) {
 			u := Bind(s)
@@ -453,6 +466,12 @@ func EnvCases[E any](t PpuBenchEnvTests[E]) []run.Case {
 			e := t.Env(u)
 			u.Reset()
 			t.SpritesBasic(u, e)
+		}},
+		{Name: "random_scene", Category: "random", Seeds: 16, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.RandomScene(u, e)
 		}},
 		{Name: "bandwidth_8bpp", Category: "stress", Body: func(s *tb.Sim) {
 			u := Bind(s)
