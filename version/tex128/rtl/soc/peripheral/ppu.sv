@@ -670,17 +670,34 @@ logic [KW-1:0] b_k;
 logic [31:0]   b_addr_r;
 logic [2:0]    b_size_r;
 
+// Which slot's word goes first: by urgency, then the lowest slot. A slot in index order alone let sprites loaded early (far
+// right on the line, or for the next line) take the bus from sprites the beam is about to reach: with more slots there are
+// more of those, so 24 slots did worse than 8 on the bandwidth ladder (the 50 MHz sweep).
+//   0  on the line on show, the beam inside it or within 16 pixels: the word it needs now (it is about to stall)
+//   1  the same: its next word (prefetch, one ahead at most)
+//   2  on the line on show, not reached yet: its first words
+//   3  for a later line (admitted early): its first words
 logic          b_want [A];
+logic [1:0]    b_lvl  [A];
 logic          any_want;
 logic [AW-1:0] want_s;
 always_comb begin
-    any_want = 1'b0; want_s = '0;
+    logic [3:0]    lvl_any;
+    logic [AW-1:0] lvl_s [4];
+    lvl_any = '0;
+    for (int l = 0; l < 4; l++) lvl_s[l] = '0;
     for (int s = A - 1; s >= 0; s--) begin
         logic signed [KW-1:0] ahead;
-        ahead = shf[s] ? (skc[s] - skf[s]) : (skf[s] - skc[s]);
+        logic on_show, reached;
+        ahead   = shf[s] ? (skc[s] - skf[s]) : (skf[s] - skc[s]);
+        on_show = (est == E_RUN) && (cy < 10'd480) && (sline[s] == cy[8:0]);
+        reached = ($signed({3'b000, cx}) + 13'sd16 >= sx[s]);
         b_want[s] = sv[s] && !spend[s] && !c_free[s] && (skf[s] >= skfirst[s]) && (skf[s] <= sklast[s]) && (ahead <= 1);
-        if (b_want[s]) begin any_want = 1'b1; want_s = AW'(s); end
+        b_lvl[s]  = !on_show ? 2'd3 : !reached ? 2'd2 : (ahead <= 0) ? 2'd0 : 2'd1;
+        if (b_want[s]) begin lvl_any[b_lvl[s]] = 1'b1; lvl_s[b_lvl[s]] = AW'(s); end
     end
+    any_want = |lvl_any;
+    want_s   = lvl_any[0] ? lvl_s[0] : lvl_any[1] ? lvl_s[1] : lvl_any[2] ? lvl_s[2] : lvl_s[3];
 end
 
 wire b_issue_pal  = (bph == 2'd0) && (est == E_PAL) && !pal_done;
