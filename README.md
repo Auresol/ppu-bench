@@ -163,3 +163,7 @@ Vivado sources are `version/<name>/frame/basys3/filelist.f` with `frame/basys3/`
 
 - [Hazard3](https://github.com/Wren6991/Hazard3) by Luke Wren, the RISC-V core (Apache 2.0), as a submodule.
 - Board files after Digilent's Basys3 master XDC.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). The Hazard3 submodule keeps its own licence (Apache 2.0).
