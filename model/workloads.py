@@ -3,7 +3,20 @@
 empty_black    the control case: no sprite and a black backdrop, so it is right even with no renderer
 sprites_basic  every rule of the spec at least once: a 2x-scaled giant background, 4bpp and 8bpp, palettes, flips,
                priorities and index ties, sprites off every edge, pixel-exact hitboxes (one hit, one near miss, one hidden hit)
+
+Stress workloads: each one pushes one limit, and the model reports the load it asks for (expected.json "load": the deepest
+stack of sprites over one pixel, the most sprites on one line).
+sparse         a few small sprites on the backdrop: the light case
+line_storm     80 sprites side by side on the same lines (81 on a line with the background, but only 2 deep): what a fixed
+               per-line design (NES) cannot do and a slot design that frees slots behind the beam can
+stack_7        7 sprites on the same pixels over the background: 8 deep, exactly the base design's 8 slots
+stack_16       16 sprites on the same pixels over the background: 17 deep, more than the base design's slots
+bandwidth_8bpp 6 overlapping 64x64 8bpp sprites over the background: few enough slots, but each slot needs a texture word
+               every 4 pixels: the texture bus's bandwidth is the limit
+busy_screen    all 128 sprites: the background and 127 random ones (sizes, depths, flips, palettes, hitboxes; seed fixed)
 """
+
+import random
 
 from workload import Workload, rgb444
 
@@ -33,10 +46,8 @@ def _arrow(u, v):
     return 0
 
 
-def sprites_basic():
-    wl = Workload("sprites_basic", "giant background, 4bpp/8bpp, flips, priorities, edges, hitboxes")
-
-    # palette: entry 0 the backdrop; bank 0 the background; banks 1..3 (16..63) sprite colours; 64..255 the 8bpp ramp
+def _palette(wl):
+    """entry 0 the backdrop; bank 0 (1..15) the background; banks 1..3 (16..63) sprite colours; 64..255 an 8bpp ramp."""
     wl.palette(0, rgb444(1, 1, 2))
     for n in range(1, 16):
         wl.palette(n, rgb444(n, 15 - n, (n * 7) & 15))
@@ -49,14 +60,22 @@ def sprites_basic():
     for n in range(64, 256):
         wl.palette(n, rgb444(n >> 4, (n >> 2) & 15, n & 15))
 
-    # the background: a giant 320x240 4bpp texture shown at 2x; index 0 in a few holes so the backdrop shows through
+
+def _background(wl):
+    """The background: a giant 320x240 4bpp texture shown at 2x, with holes (index 0) where the backdrop shows through."""
     wl.set_giant(320, 240, scale2=True)
 
     def bg(u, v):
         if (u // 40 + v // 40) % 5 == 4 and (u % 40) < 8:
-            return 0                                   # holes: the backdrop
+            return 0
         return 1 + ((u // 20) + (v // 20)) % 15
-    bg_tex = wl.texture(320, 240, bpp8=False, pixel=bg)
+    return wl.texture(320, 240, bpp8=False, pixel=bg)
+
+
+def sprites_basic():
+    wl = Workload("sprites_basic", "giant background, 4bpp/8bpp, flips, priorities, edges, hitboxes")
+    _palette(wl)
+    bg_tex = _background(wl)
 
     disc16 = wl.texture(16, 16, bpp8=False, pixel=_disc(8))
     disc32 = wl.texture(32, 32, bpp8=False, pixel=_disc(16))
@@ -101,4 +120,80 @@ def sprites_basic():
     return wl
 
 
-WORKLOADS = {f.__name__: f for f in (empty_black, sprites_basic)}
+def sparse():
+    wl = Workload("sparse", "4 small sprites on the backdrop, no background")
+    _palette(wl)
+    disc16 = wl.texture(16, 16, bpp8=False, pixel=_disc(8))
+    arrow = wl.texture(16, 16, bpp8=False, pixel=_arrow)
+    wl.sprite(disc16, 100, 100, pal=1)
+    wl.sprite(arrow, 300, 200, pal=2, hflip=True)
+    wl.sprite(disc16, 500, 300, pal=3)
+    wl.sprite(arrow, 600, 450, pal=1, vflip=True)
+    return wl
+
+
+def line_storm():
+    wl = Workload("line_storm", "80 8x8 sprites side by side on the same 8 lines, over the background")
+    _palette(wl)
+    bg_tex = _background(wl)
+    tile = wl.texture(8, 8, bpp8=False, pixel=lambda u, v: 0 if (u, v) in ((0, 0), (7, 0), (0, 7), (7, 7)) else 1 + (u + v) % 3)
+    for n in range(80):
+        wl.sprite(tile, 8 * n, 236, pal=1 + n % 3, hflip=bool(n & 1), vflip=bool(n & 2))
+    wl.sprite(bg_tex, 0, 0, prio=3, giant=True, index=127)
+    return wl
+
+
+def _stack(n):
+    wl = Workload(f"stack_{n}", f"{n} 32x32 sprites on the same pixels (offsets of 1 pixel), over the background")
+    _palette(wl)
+    bg_tex = _background(wl)
+    disc32 = wl.texture(32, 32, bpp8=False, pixel=_disc(16))
+    for i in range(n):
+        wl.sprite(disc32, 300 + i, 220 + i, pal=1 + i % 3, prio=i % 3)
+    wl.sprite(bg_tex, 0, 0, prio=3, giant=True, index=127)
+    return wl
+
+
+def stack_7():
+    return _stack(7)
+
+
+def stack_16():
+    return _stack(16)
+
+
+def bandwidth_8bpp():
+    wl = Workload("bandwidth_8bpp", "6 overlapping 64x64 8bpp sprites over the background: one texture word every 4 pixels each")
+    _palette(wl)
+    bg_tex = _background(wl)
+    ramp = wl.texture(64, 64, bpp8=True, pixel=lambda u, v: 64 + (u * 3 + v * 5) % 192)
+    for i in range(6):
+        wl.sprite(ramp, 200 + 8 * i, 200 + 8 * i, prio=i % 3, hflip=bool(i & 1))
+    wl.sprite(bg_tex, 0, 0, prio=3, giant=True, index=127)
+    return wl
+
+
+def busy_screen():
+    wl = Workload("busy_screen", "the background and 127 random sprites: sizes, depths, flips, palettes, hitboxes (seed 1)")
+    rng = random.Random(1)
+    _palette(wl)
+    bg_tex = _background(wl)
+    textures = [
+        wl.texture(8, 8, bpp8=False, pixel=_disc(4)),
+        wl.texture(16, 16, bpp8=False, pixel=_disc(8)),
+        wl.texture(16, 16, bpp8=False, pixel=_arrow),
+        wl.texture(32, 32, bpp8=False, pixel=_disc(16)),
+        wl.texture(64, 32, bpp8=False, pixel=lambda u, v: 0 if (u // 8 + v // 8) % 2 else 1 + (u // 16) % 3),
+        wl.texture(32, 32, bpp8=True, pixel=lambda u, v: 0 if (u - 16) ** 2 + (v - 16) ** 2 > 256 else 64 + (u * 5 + v) % 192),
+        wl.texture(64, 64, bpp8=True, pixel=lambda u, v: 0 if (u - 32) ** 2 + (v - 32) ** 2 < 100 else 64 + (u + v * 3) % 192),
+    ]
+    for i in range(127):
+        t = rng.choice(textures)
+        wl.sprite(t, rng.randrange(-t.w // 2, 640), rng.randrange(-t.h // 2, 480), pal=rng.randrange(1, 4),
+                  prio=rng.randrange(0, 3), hflip=rng.random() < 0.5, vflip=rng.random() < 0.5, hitbox=rng.random() < 0.2)
+    wl.sprite(bg_tex, 0, 0, prio=3, giant=True, index=127)
+    return wl
+
+
+WORKLOADS = {f.__name__: f for f in (empty_black, sprites_basic, sparse, line_storm, stack_7, stack_16, bandwidth_8bpp,
+                                     busy_screen)}

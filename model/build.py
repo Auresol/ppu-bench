@@ -4,7 +4,7 @@
 Writes into <out dir>:
   workload.h      the C arrays the firmware copies into the chip (texture SRAM image, OAM, GIANT)
   expected.bin    the golden frame: 640 x 480 rgb444 values, uint16 little endian, row-major
-  expected.json   the golden hit bits (4 words, HIT0..HIT3) and the frame's size
+  expected.json   the golden hit bits (4 words, HIT0..HIT3), the frame's size and its load (max stack depth, max per line)
   expected.png    the golden frame, to look at
   tex.bin         the texture SRAM image the firmware loads (the testbench checks tex0 against it)
 """
@@ -75,13 +75,14 @@ def main():
         for row in frame.pixels:
             f.write(struct.pack(f"<{SCREEN_W}H", *row))
     with open(os.path.join(out, "expected.json"), "w") as f:
-        json.dump({"workload": name, "width": SCREEN_W, "height": SCREEN_H, "hit": frame.hit_words(),
-                   "hit_sprites": [i for i in range(128) if frame.hits >> i & 1]}, f, indent=1)
+        json.dump({"workload": name, "desc": wl.desc, "width": SCREEN_W, "height": SCREEN_H, "hit": frame.hit_words(),
+                   "hit_sprites": [i for i in range(128) if frame.hits >> i & 1], "load": frame.load}, f, indent=1)
     write_png(os.path.join(out, "expected.png"), frame.pixels)
     with open(os.path.join(out, "tex.bin"), "wb") as f:
         f.write(tex)
-    print(f"{name}: {len(tex)} texture bytes, {sum(1 for i in range(128) if wl.oam[2 * i] >> 28 & 1)} sprites, "
-          f"hits {[i for i in range(128) if frame.hits >> i & 1]} -> {out}")
+    ld = frame.load
+    print(f"{name}: {len(tex)} texture bytes, {ld['sprites']} sprites, depth {ld['max_depth']} at {ld['max_depth_at']}, "
+          f"{ld['max_per_line']} on line {ld['max_per_line_at']}, hits {[i for i in range(128) if frame.hits >> i & 1]} -> {out}")
 
 
 if __name__ == "__main__":

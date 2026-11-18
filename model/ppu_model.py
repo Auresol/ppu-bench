@@ -99,6 +99,7 @@ def texel(sp, tex, u, v):
 class Frame:
     pixels: list       # SCREEN_H rows of SCREEN_W rgb444 values
     hits: int          # bit i = sprite i was hit (section 7)
+    load: dict         # what the frame asks of the hardware (not part of the picture): see render()
 
     def hit_words(self):
         return [(self.hits >> (32 * n)) & 0xFFFFFFFF for n in range(4)]
@@ -125,6 +126,8 @@ def render(oam, giant, tex):
     colour = [[palette_entry(tex, 0)] * SCREEN_W for _ in range(SCREEN_H)]   # backdrop: palette[0]
     hit_owner = [[-1] * SCREEN_W for _ in range(SCREEN_H)]     # one opaque hitbox sprite already seen at the pixel
     hits = 0
+    depth = [[0] * SCREEN_W for _ in range(SCREEN_H)]          # sprites whose rectangle covers the pixel, opaque or not
+    per_line = [0] * SCREEN_H
 
     for sp in sprites:
         x0, x1 = max(sp.x, 0), min(sp.x + sp.W * sp.s, SCREEN_W)
@@ -135,7 +138,10 @@ def render(oam, giant, tex):
             if sp.vflip:
                 v = sp.H - 1 - v
             row_front, row_colour, row_owner = front[sy], colour[sy], hit_owner[sy]
+            per_line[sy] += 1
+            row_depth = depth[sy]
             for sx in range(x0, x1):
+                row_depth[sx] += 1
                 u = (sx - sp.x) // sp.s
                 if sp.hflip:
                     u = sp.W - 1 - u
@@ -152,4 +158,14 @@ def render(oam, giant, tex):
                     elif other != sp.index:
                         hits |= (1 << other) | (1 << sp.index)
 
-    return Frame(pixels=colour, hits=hits)
+    # the load: the deepest stack of sprites over one pixel (what a slot design must hold at once) and the most sprites on one
+    # line (what a fixed per-line design must hold), with where they are
+    max_depth, at = 0, (0, 0)
+    for sy in range(SCREEN_H):
+        for sx in range(SCREEN_W):
+            if depth[sy][sx] > max_depth:
+                max_depth, at = depth[sy][sx], (sx, sy)
+    line = max(range(SCREEN_H), key=lambda y: per_line[y])
+    load = {"sprites": len(sprites), "max_depth": max_depth, "max_depth_at": list(at),
+            "max_per_line": per_line[line], "max_per_line_at": line}
+    return Frame(pixels=colour, hits=hits, load=load)

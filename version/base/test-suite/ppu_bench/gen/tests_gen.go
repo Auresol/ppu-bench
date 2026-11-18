@@ -16,6 +16,18 @@ type PpuBenchTests interface {
 	EmptyBlack(u *PpuBench)
 	// frame/sprites_basic: a scaled giant background, overlapping 4bpp and 8bpp sprites, flips, off-screen edges and hitboxes
 	SpritesBasic(u *PpuBench)
+	// stress/bandwidth_8bpp: 6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels per sprite
+	Bandwidth8bpp(u *PpuBench)
+	// stress/busy_screen: all 128 sprites: background and 127 random ones
+	BusyScreen(u *PpuBench)
+	// stress/line_storm: 80 sprites side by side on the same lines (81 on a line, 2 deep)
+	LineStorm(u *PpuBench)
+	// stress/sparse: 4 small sprites on the backdrop: the light case
+	Sparse(u *PpuBench)
+	// stress/stack_16: 16 sprites on the same pixels over the background: 17 deep
+	Stack16(u *PpuBench)
+	// stress/stack_7: 7 sprites on the same pixels over the background: 8 deep
+	Stack7(u *PpuBench)
 }
 
 // PpuBenchDefaults implements every declared test as not written, and a test with firmware: as boot and run to the verdict. Embed it
@@ -26,6 +38,18 @@ func (PpuBenchDefaults) EmptyBlack(u *PpuBench) { u.Sim.NotWritten() }
 
 func (PpuBenchDefaults) SpritesBasic(u *PpuBench) { u.Sim.NotWritten() }
 
+func (PpuBenchDefaults) Bandwidth8bpp(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) BusyScreen(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) LineStorm(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Sparse(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Stack16(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Stack7(u *PpuBench) { u.Sim.NotWritten() }
+
 // PpuBenchEnvTests is PpuBenchTests for a module with an environment (adr/testbench-worlds/). Env is called for every case, after the binding
 // (the pins, the bus masters and slaves it declares) and before the first Step, so the nodes and scripts it declares are there before cycle 0;
 // it declares them (tb.Declare, Sim.Script) and returns what the cases need. Every case gets the result.
@@ -35,6 +59,18 @@ type PpuBenchEnvTests[E any] interface {
 	EmptyBlack(u *PpuBench, e *E)
 	// frame/sprites_basic: a scaled giant background, overlapping 4bpp and 8bpp sprites, flips, off-screen edges and hitboxes
 	SpritesBasic(u *PpuBench, e *E)
+	// stress/bandwidth_8bpp: 6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels per sprite
+	Bandwidth8bpp(u *PpuBench, e *E)
+	// stress/busy_screen: all 128 sprites: background and 127 random ones
+	BusyScreen(u *PpuBench, e *E)
+	// stress/line_storm: 80 sprites side by side on the same lines (81 on a line, 2 deep)
+	LineStorm(u *PpuBench, e *E)
+	// stress/sparse: 4 small sprites on the backdrop: the light case
+	Sparse(u *PpuBench, e *E)
+	// stress/stack_16: 16 sprites on the same pixels over the background: 17 deep
+	Stack16(u *PpuBench, e *E)
+	// stress/stack_7: 7 sprites on the same pixels over the background: 8 deep
+	Stack7(u *PpuBench, e *E)
 }
 
 // PpuBenchEnvDefaults is PpuBenchDefaults for a module with an Env: embed PpuBenchEnvDefaults[Env].
@@ -44,8 +80,20 @@ func (PpuBenchEnvDefaults[E]) EmptyBlack(u *PpuBench, _ *E) { u.Sim.NotWritten()
 
 func (PpuBenchEnvDefaults[E]) SpritesBasic(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
+func (PpuBenchEnvDefaults[E]) Bandwidth8bpp(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) BusyScreen(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) LineStorm(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Sparse(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Stack16(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Stack7(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
 // Methods are the Go names of the declared tests, for run.Orphans.
-var Methods = []string{"EmptyBlack", "SpritesBasic"}
+var Methods = []string{"EmptyBlack", "SpritesBasic", "Bandwidth8bpp", "BusyScreen", "LineStorm", "Sparse", "Stack16", "Stack7"}
 
 // Cases are the declared tests, each on a fresh model, reset first.
 func Cases(t PpuBenchTests) []run.Case {
@@ -59,6 +107,36 @@ func Cases(t PpuBenchTests) []run.Case {
 			u := Bind(s)
 			u.Reset()
 			t.SpritesBasic(u)
+		}},
+		{Name: "bandwidth_8bpp", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Bandwidth8bpp(u)
+		}},
+		{Name: "busy_screen", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.BusyScreen(u)
+		}},
+		{Name: "line_storm", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.LineStorm(u)
+		}},
+		{Name: "sparse", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Sparse(u)
+		}},
+		{Name: "stack_16", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Stack16(u)
+		}},
+		{Name: "stack_7", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Stack7(u)
 		}},
 	}
 }
@@ -77,6 +155,42 @@ func EnvCases[E any](t PpuBenchEnvTests[E]) []run.Case {
 			e := t.Env(u)
 			u.Reset()
 			t.SpritesBasic(u, e)
+		}},
+		{Name: "bandwidth_8bpp", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Bandwidth8bpp(u, e)
+		}},
+		{Name: "busy_screen", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.BusyScreen(u, e)
+		}},
+		{Name: "line_storm", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.LineStorm(u, e)
+		}},
+		{Name: "sparse", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Sparse(u, e)
+		}},
+		{Name: "stack_16", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Stack16(u, e)
+		}},
+		{Name: "stack_7", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Stack7(u, e)
 		}},
 	}
 }

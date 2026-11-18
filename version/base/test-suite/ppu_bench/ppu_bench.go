@@ -32,6 +32,14 @@ var Tests = &T{}
 func (t *T) EmptyBlack(u *gen.PpuBench)   { oneFrame(u, "empty_black") }
 func (t *T) SpritesBasic(u *gen.PpuBench) { oneFrame(u, "sprites_basic") }
 
+// stress: one limit each (model/workloads.py); a failure is a deadline the configuration misses
+func (t *T) Sparse(u *gen.PpuBench)        { oneFrame(u, "sparse") }
+func (t *T) LineStorm(u *gen.PpuBench)     { oneFrame(u, "line_storm") }
+func (t *T) Stack7(u *gen.PpuBench)        { oneFrame(u, "stack_7") }
+func (t *T) Stack16(u *gen.PpuBench)       { oneFrame(u, "stack_16") }
+func (t *T) Bandwidth8bpp(u *gen.PpuBench) { oneFrame(u, "bandwidth_8bpp") }
+func (t *T) BusyScreen(u *gen.PpuBench)    { oneFrame(u, "busy_screen") }
+
 // The raster of the stream VGA block (guide/vga.md): 640x480@60 in 800 x 525, 4 chip cycles a pixel at 100 MHz.
 const (
 	screenW, screenH = 640, 480
@@ -63,6 +71,13 @@ type expected struct {
 	Workload string   `json:"workload"`
 	Hit      []uint32 `json:"hit"`
 	Sprites  []int    `json:"hit_sprites"`
+	Load     struct {
+		Sprites    int   `json:"sprites"`
+		MaxDepth   int   `json:"max_depth"`
+		DepthAt    []int `json:"max_depth_at"`
+		MaxPerLine int   `json:"max_per_line"`
+		LineAt     int   `json:"max_per_line_at"`
+	} `json:"load"`
 	frame    []uint16
 }
 
@@ -116,7 +131,11 @@ func oneFrame(u *gen.PpuBench, workload string) {
 	writePNG(s, gotPNG, got)
 	u.Metric("frame_bad_pixels", int64(bad))
 	u.Metric("late_pixels", int64(res.late))
-	s.Logf("%s: %d of %d pixels wrong, LATE %d; captured frame in %s", workload, bad, len(got), res.late, gotPNG)
+	l := want.Load
+	s.Logf("%s: %d of %d pixels wrong, LATE %d; load: %d sprites, %d deep at %v, %d on line %d; captured frame in %s",
+		workload, bad, len(got), res.late, l.Sprites, l.MaxDepth, l.DepthAt, l.MaxPerLine, l.LineAt, gotPNG)
+	u.Metric("load_max_depth", int64(l.MaxDepth))
+	u.Metric("load_max_per_line", int64(l.MaxPerLine))
 	if bad > 0 {
 		s.Errorf("frame: %d pixels differ from the golden model; first: %v (see %s and expected.png)", bad, first, gotPNG)
 	}

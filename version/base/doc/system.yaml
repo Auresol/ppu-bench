@@ -75,3 +75,12 @@ tests:
   frame:
     empty_black:   {desc: "no sprite, black backdrop: the control case, right even with no renderer"}
     sprites_basic: {desc: "a scaled giant background, overlapping 4bpp and 8bpp sprites, flips, off-screen edges and hitboxes"}
+  # stress: each pushes one limit (model/workloads.py). A FAIL here is a result of the benchmark (a deadline the configuration
+  # misses: LATE > 0), not a broken test; the log line gives the load the workload asks for.
+  stress:
+    sparse:         {desc: "4 small sprites on the backdrop: the light case"}
+    line_storm:     {desc: "80 sprites side by side on the same lines (81 on a line, 2 deep)"}
+    stack_7:        {desc: "7 sprites on the same pixels over the background: 8 deep"}
+    stack_16:       {desc: "16 sprites on the same pixels over the background: 17 deep"}
+    bandwidth_8bpp: {desc: "6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels per sprite"}
+    busy_screen:    {desc: "all 128 sprites: background and 127 random ones"}
