@@ -12,6 +12,7 @@ package ppubench
 import (
 	"debug/elf"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -115,14 +116,14 @@ func oneFrame(u *gen.PpuBench, name string) {
 	}
 	elfPath := benchProgram(s, root)
 
-	// the program into sram0, the workload into its .noinit buffer (crt0 does not clear it), then a reset: Hazard3 starts at
-	// 0, where the program now is
-	sram, err := u.Mem("sram0")
+	// the program into the core's RAM (u.Regions(): sram0; tex0 on the private bus is no region), the workload into its .noinit
+	// buffer (crt0 does not clear it), then a reset: Hazard3 starts at 0, where the program now is
+	if _, err := tb.LoadELF(elfPath, u.Regions()); err != nil {
+		s.Fatalf("load %s: %v", elfPath, err)
+	}
+	sram, err := u.Mem("sram0") // the workload and the results, by symbol
 	if err != nil {
 		s.Fatalf("%v", err)
-	}
-	if _, err := tb.LoadELF(elfPath, []tb.Region{{Base: 0, Mem: sram}}); err != nil {
-		s.Fatalf("load %s: %v", elfPath, err)
 	}
 	writeWorkload(s, sram, symbol(s, elfPath, "workload"), wl, image)
 	resAddr := symbol(s, elfPath, "bench_result")
@@ -283,8 +284,7 @@ func where(u *gen.PpuBench, readResult func() result) string {
 func checkTextures(u *gen.PpuBench, want []byte) {
 	s := u.Sim
 	tex0, err := u.Mem("tex0")
-	// the text of tb.ErrMemTooWide: hw-proj before 6451f7ff8 (still on some job hosts) has the message but not the error value
-	if err != nil && strings.Contains(err.Error(), "backdoor not supported") {
+	if errors.Is(err, tb.ErrMemTooWide) {
 		// the backdoor reads words of up to 64 bits (a 128-bit bus tex is wider): the frame check still covers the textures
 		s.Logf("tex0 not checked: %v", err)
 		return
