@@ -4,6 +4,7 @@
 # its colour back (pixel). Until the render unit starts (use_ppu = ppu0.engine_on) it shows its own colour bars: a monitor check
 # on the board with no firmware. No bus.
 kind: peripheral
+category: display
 description: VGA output unit, 640x480@60 stream (no buffer); colour bars until the render unit starts, then its pixels
 ports:
   - {name: x, dir: out, width: 10}

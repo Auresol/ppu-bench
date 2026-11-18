@@ -3,6 +3,7 @@
 # Which instructions it has is derived: isa_fixed: are always on, and each isa_params: letter is on when its parameter is not 0
 # (the instance's params: in system.yaml first, else the RTL default). The isa string is made once from them.
 kind: core
+category: compute
 reset_vector: RESET_VECTOR   # the parameter that holds the reset vector (with a boot.yaml hw-proj sets it)
 hart_id: {port: mhartid_val} # this input takes the hart index (0 for the first core)
 clock_in: [clk_always_on]    # this input takes the instance's clock

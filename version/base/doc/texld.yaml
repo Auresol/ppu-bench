@@ -2,6 +2,7 @@
 # (an access at window offset k is an access at tex address k), and a master on bus tex that carries it out. While lock is high
 # (the render unit has started) every access is refused with an AHB error and nothing reaches bus tex: it belongs to the render unit.
 kind: peripheral
+category: streamer
 wait: {max: 3}   # 2 wait states when bus tex answers at once; before the start the render unit leaves bus tex idle
 description: Bridge from the main bus into the texture bus, writable only before the engine starts
 bus:

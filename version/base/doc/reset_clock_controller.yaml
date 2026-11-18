@@ -2,3 +2,4 @@
 # port per clock source, clk_<domain>, a port per reset source, rst_n_<group>); ports: lists only what you add.
 # No bus: block: nothing reads its registers, so it has none and no slave entry.
 kind: housekeeping
+category: clock

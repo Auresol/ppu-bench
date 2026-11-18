@@ -4,6 +4,7 @@
 # - cfg: a slave on bus main. The registers below.
 # It streams into the VGA output unit racer0 (doc/racer.yaml): racer0 names the pixel it needs, ppu0 puts its colour on `pixel`.
 kind: peripheral
+category: compute
 description: Sprite render unit that races the beam, master on the main and texture buses, streams pixels into racer0
 bus:
   interfaces:

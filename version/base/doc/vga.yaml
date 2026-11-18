@@ -2,3 +2,4 @@
 # racer.sv (instance racer0) instantiates it; the render unit ppu0 puts the colour of pixel (x, y) on its wire `pixel`.
 # lead is the depth of the render unit's colour pipeline in display pixels: 3 (texel, priority, palette). racer's bars use the same lead.
 vga: {picture: 640x480, format: rgb444, mode: stream, lead: 3}
+category: display
