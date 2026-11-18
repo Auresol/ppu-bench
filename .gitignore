@@ -3,9 +3,9 @@ html/
 sim/obj_dir/
 # the firmware compiler (nix build ... -o .toolchain/<isa>)
 .toolchain/
-bench/build/
-__pycache__/
 version/base/fw/app.elf
 version/base/fw/app.bin
 .toolchain.lock
 version/base/fw/showcase/*.elf
+version/base/fw/bench/bench.elf
+version/base/fw/bench/.build.lock

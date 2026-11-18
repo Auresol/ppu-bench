@@ -1,9 +1,10 @@
 // The chip tests of ppu_bench: one frame per reset (spec/sprite-spec.md section 8).
 //
-// Each case loads bench/build/<workload>/app.elf into sram0 through the backdoor (the program runs from RAM: there is no
-// flash and no boot ROM, so hw-proj's firmware: cases do not apply), resets the chip, captures the picture from the VGA
-// pins, finds the frame the render unit drew and compares it pixel by pixel with the golden model's (model/build.py),
-// then checks LATE and the hit bits the firmware read back. Each case builds its workload first (make -C bench).
+// Each case builds its workload and the golden frame in Go (workloads.go, model.go), loads the one benchmark program
+// (version/base/fw/bench) into sram0 and writes the workload into its .noinit buffer through the backdoor (the program runs
+// from RAM: there is no flash and no boot ROM, so hw-proj's firmware: cases do not apply), resets the chip, captures the
+// picture from the VGA pins, finds the frame the render unit drew and compares it pixel by pixel with the golden one, then
+// checks LATE and the hit bits the firmware read back.
 //
 // The capture holds a frame in the testbench, never in the chip: the chip streams each pixel once on its pins.
 package ppubench
@@ -11,7 +12,6 @@ package ppubench
 import (
 	"debug/elf"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"ppu_bench/test-suite/hwproj-tb"
 	"ppu_bench/test-suite/ppu_bench/gen"
@@ -81,22 +82,7 @@ func (p pins) rgb() uint16 { return uint16(p.u.PadOut.Get()>>padRGB) & 0xFFF }
 func (p pins) hs() uint64  { return p.u.PadOut.Get() >> padHsync & 1 }
 func (p pins) vs() uint64  { return p.u.PadOut.Get() >> padVsync & 1 }
 
-// expected is model/build.py's output for one workload.
-type expected struct {
-	Workload string   `json:"workload"`
-	Hit      []uint32 `json:"hit"`
-	Sprites  []int    `json:"hit_sprites"`
-	Load     struct {
-		Sprites    int   `json:"sprites"`
-		MaxDepth   int   `json:"max_depth"`
-		DepthAt    []int `json:"max_depth_at"`
-		MaxPerLine int   `json:"max_per_line"`
-		LineAt     int   `json:"max_per_line_at"`
-	} `json:"load"`
-	frame []uint16
-}
-
-// result is struct bench_result of bench/main.c, read through the backdoor.
+// result is struct bench_result of version/base/fw/bench/bench.c, read through the backdoor.
 type result struct {
 	late, done uint32
 	hit        [4]uint32
@@ -114,23 +100,23 @@ type perf struct {
 	TexWantPeak uint32 `json:"tex_want_peak"`
 }
 
-func oneFrame(u *gen.PpuBench, workload string) {
+func oneFrame(u *gen.PpuBench, name string) {
 	s := u.Sim
 	root := repoRoot(s)
-	dir := filepath.Join(root, "bench", "build", workload)
-	elfPath := filepath.Join(dir, "app.elf")
-	// the workload (golden frame, firmware) is built here when it is missing or stale: bench/build is not in git, so a job's
-	// fresh worktree has none. make is a no-op when it is up to date.
-	if out, err := exec.Command("make", "-C", filepath.Join(root, "bench"), "WORKLOADS="+workload).CombinedOutput(); err != nil {
-		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		s.Fatalf("%s: make -C bench WORKLOADS=%s: %v; last output:\n%s", workload, workload, err, strings.Join(lines[max(0, len(lines)-15):], "\n"))
+	mk, ok := workloads[name]
+	if !ok {
+		s.Fatalf("no workload %q in workloads.go", name)
 	}
-	if _, err := os.Stat(elfPath); err != nil {
-		s.Fatalf("%s: no %s after make -C bench", workload, elfPath)
+	wl := mk()
+	image := wl.texBytes()
+	want, err := render(wl.oam, wl.giant, image)
+	if err != nil {
+		s.Fatalf("%s: %v", name, err)
 	}
-	want := loadExpected(s, dir)
+	elfPath := benchProgram(s, root)
 
-	// the program into sram0, then a reset: Hazard3 starts at 0, where the program now is
+	// the program into sram0, the workload into its .noinit buffer (crt0 does not clear it), then a reset: Hazard3 starts at
+	// 0, where the program now is
 	sram, err := u.Mem("sram0")
 	if err != nil {
 		s.Fatalf("%v", err)
@@ -138,6 +124,7 @@ func oneFrame(u *gen.PpuBench, workload string) {
 	if _, err := tb.LoadELF(elfPath, []tb.Region{{Base: 0, Mem: sram}}); err != nil {
 		s.Fatalf("load %s: %v", elfPath, err)
 	}
+	writeWorkload(s, sram, symbol(s, elfPath, "workload"), wl, image)
 	resAddr := symbol(s, elfPath, "bench_result")
 	readResult := func() result {
 		w := func(off uint64) uint32 { return uint32(sram.Read(int((resAddr + off) / 4))) }
@@ -145,12 +132,13 @@ func oneFrame(u *gen.PpuBench, workload string) {
 			FrameCyc: w(24), TexBusy: w(28), MainBusy: w(32), SlotsPeak: w(36), AdmWait: w(40), AdmSlack: int32(w(44)),
 			TexWantPeak: w(48)}}
 	}
+	dir := frameDir(root, name)
 	u.Reset()
 
 	got, res := capture(u, readResult)
 
 	// the textures went through the loader into tex0 (bus tex) intact
-	checkTextures(u, dir)
+	checkTextures(u, image)
 
 	// the picture
 	bad := 0
@@ -165,11 +153,12 @@ func oneFrame(u *gen.PpuBench, workload string) {
 	}
 	gotPNG := filepath.Join(dir, "got.png")
 	writePNG(s, gotPNG, got)
+	writePNG(s, filepath.Join(dir, "expected.png"), want.frame)
 	u.Metric("frame_bad_pixels", int64(bad))
 	u.Metric("late_pixels", int64(res.late))
-	l := want.Load
+	l := want.load
 	s.Logf("%s: %d of %d pixels wrong, LATE %d; load: %d sprites, %d deep at %v, %d on line %d; captured frame in %s",
-		workload, bad, len(got), res.late, l.Sprites, l.MaxDepth, l.DepthAt, l.MaxPerLine, l.LineAt, gotPNG)
+		name, bad, len(got), res.late, l.Sprites, l.MaxDepth, l.DepthAt, l.MaxPerLine, l.LineAt, gotPNG)
 	u.Metric("load_max_depth", int64(l.MaxDepth))
 	u.Metric("load_max_per_line", int64(l.MaxPerLine))
 	p := res.perf
@@ -181,8 +170,7 @@ func oneFrame(u *gen.PpuBench, workload string) {
 	u.Metric("adm_slack_pixels", int64(p.AdmSlack))
 	u.Metric("tex_want_peak", int64(p.TexWantPeak))
 	s.Logf("%s: bus tex busy %.1f%%, bus main busy %.1f%%, slots peak %d, admission waited %d cycles, admission slack %d px, "+
-		"fetch queue peak %d", workload, pct(p.TexBusy), pct(p.MainBusy), p.SlotsPeak, p.AdmWait, p.AdmSlack, p.TexWantPeak)
-	writeResult(s, workload, bad, res, want)
+		"fetch queue peak %d", name, pct(p.TexBusy), pct(p.MainBusy), p.SlotsPeak, p.AdmWait, p.AdmSlack, p.TexWantPeak)
 	if bad > 0 {
 		s.Errorf("frame: %d pixels differ from the golden model; first: %v (see %s and expected.png)", bad, first, gotPNG)
 	}
@@ -192,8 +180,8 @@ func oneFrame(u *gen.PpuBench, workload string) {
 	}
 	// hit bits (section 7)
 	for n := 0; n < 4; n++ {
-		if res.hit[n] != want.Hit[n] {
-			s.Errorf("HIT%d = %08x, want %08x (sprites hit: %v)", n, res.hit[n], want.Hit[n], want.Sprites)
+		if res.hit[n] != want.hit[n] {
+			s.Errorf("HIT%d = %08x, want %08x", n, res.hit[n], want.hit[n])
 		}
 	}
 }
@@ -212,6 +200,8 @@ func capture(u *gen.PpuBench, readResult func() result) ([]uint16, result) {
 		u.Run(20 * lineCycles)
 		if r := readResult(); r.done == 1 {
 			return frame, r
+		} else if r.done == 0xBAD {
+			s.Fatalf("the program found no workload in its buffer (magic)")
 		}
 		u.Run(uint64(frameLines-screenH-20) * lineCycles)
 	}
@@ -289,13 +279,9 @@ func where(u *gen.PpuBench, readResult func() result) string {
 	return msg
 }
 
-// checkTextures compares tex0, read through the backdoor, with the image the firmware loaded (tex.bin of model/build.py).
-func checkTextures(u *gen.PpuBench, dir string) {
+// checkTextures compares tex0, read through the backdoor, with the image the firmware loaded.
+func checkTextures(u *gen.PpuBench, want []byte) {
 	s := u.Sim
-	want, err := os.ReadFile(filepath.Join(dir, "tex.bin"))
-	if err != nil {
-		s.Fatalf("%v (make -C bench)", err)
-	}
 	tex0, err := u.Mem("tex0")
 	// the text of tb.ErrMemTooWide: hw-proj before 6451f7ff8 (still on some job hosts) has the message but not the error value
 	if err != nil && strings.Contains(err.Error(), "backdoor not supported") {
@@ -316,53 +302,6 @@ func checkTextures(u *gen.PpuBench, dir string) {
 			return
 		}
 	}
-}
-
-// writeResult writes bench/build/results/<version>/<workload>.json: the verdict, the load and the counters of one run, for
-// tables across versions (bench/results.py). The version is read from the test binary's path (build/versions/<v>/...).
-func writeResult(s *tb.Sim, workload string, bad int, res result, want expected) {
-	version := "base"
-	if exe, err := os.Executable(); err == nil {
-		parts := strings.Split(filepath.ToSlash(exe), "/")
-		for i := 0; i+1 < len(parts); i++ {
-			if parts[i] == "versions" {
-				version = parts[i+1]
-			}
-		}
-	}
-	dir := filepath.Join(repoRoot(s), "bench", "build", "results", version)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		s.Errorf("%v", err)
-		return
-	}
-	out := map[string]any{
-		"version": version, "workload": workload, "pass": bad == 0 && res.late == 0, "bad_pixels": bad, "late_pixels": res.late,
-		"load": want.Load, "perf": res.perf,
-	}
-	b, _ := json.MarshalIndent(out, "", " ")
-	if err := os.WriteFile(filepath.Join(dir, workload+".json"), b, 0o644); err != nil {
-		s.Errorf("%v", err)
-	}
-}
-
-func loadExpected(s *tb.Sim, dir string) expected {
-	var e expected
-	b, err := os.ReadFile(filepath.Join(dir, "expected.json"))
-	if err != nil {
-		s.Fatalf("%v (make -C bench)", err)
-	}
-	if err := json.Unmarshal(b, &e); err != nil || len(e.Hit) != 4 {
-		s.Fatalf("expected.json of %s: %v", dir, err)
-	}
-	raw, err := os.ReadFile(filepath.Join(dir, "expected.bin"))
-	if err != nil || len(raw) != 2*screenW*screenH {
-		s.Fatalf("expected.bin of %s: %d bytes, %v", dir, len(raw), err)
-	}
-	e.frame = make([]uint16, screenW*screenH)
-	for i := range e.frame {
-		e.frame[i] = binary.LittleEndian.Uint16(raw[2*i:])
-	}
-	return e
 }
 
 func symbol(s *tb.Sim, path, name string) uint64 {
@@ -411,4 +350,59 @@ func repoRoot(s *tb.Sim) string {
 			s.Fatalf("no repo root (version/base/doc/system.yaml) above %s", dir)
 		}
 	}
+}
+
+const (
+	wlMagic  = 0x574C4F41 // bench.c WL_MAGIC
+	wlTexMax = 12800      // bench.c WL_TEX_MAX, in words
+)
+
+// writeWorkload fills `struct workload` of bench.c (magic, giant, texture words, the 256 OAM words, the image) by backdoor.
+func writeWorkload(s *tb.Sim, sram *tb.Mem, addr uint64, wl *workload, image []byte) {
+	words := len(image) / 4
+	if words > wlTexMax {
+		s.Fatalf("%s: %d texture words, the program's buffer has %d", wl.name, words, wlTexMax)
+	}
+	at := int(addr / 4)
+	sram.Write(at, wlMagic)
+	sram.Write(at+1, uint64(wl.giant))
+	sram.Write(at+2, uint64(words))
+	sram.Write(at+3, 0)
+	for i, w := range wl.oam {
+		sram.Write(at+4+i, uint64(w))
+	}
+	for i := 0; i < words; i++ {
+		sram.Write(at+4+len(wl.oam)+i, uint64(binary.LittleEndian.Uint32(image[4*i:])))
+	}
+}
+
+// benchProgram builds version/base/fw/bench/bench.elf (make is a no-op when it is up to date) and returns its path. Cases run
+// in parallel processes, so the build holds a lock file. hw-proj builds the programs of firmware: cases only for a chip with
+// a flash and a boot ROM; this one boots from RAM (handoff ram-boot-firmware-cases.md in hw-proj).
+func benchProgram(s *tb.Sim, root string) string {
+	dir := filepath.Join(root, "version", "base", "fw", "bench")
+	lock, err := os.OpenFile(filepath.Join(dir, ".build.lock"), os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		s.Fatalf("%v", err)
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		s.Fatalf("lock %s: %v", lock.Name(), err)
+	}
+	if out, err := exec.Command("make", "-C", dir, "bench.elf").CombinedOutput(); err != nil {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		s.Fatalf("make -C %s bench.elf: %v; last output:\n%s", dir, err, strings.Join(lines[max(0, len(lines)-15):], "\n"))
+	}
+	return filepath.Join(dir, "bench.elf")
+}
+
+// frameDir is where a case's pictures go: the job's run folder (beside JOB_SCRATCH, so `job-manager fetch` brings them),
+// else test-suite/build/frames/, both <dir>/<workload>/.
+func frameDir(root, name string) string {
+	dir := filepath.Join(root, "version", "base", "test-suite", "build", "frames", name)
+	if scratch := os.Getenv("JOB_SCRATCH"); scratch != "" {
+		dir = filepath.Join(filepath.Dir(scratch), "frames", name)
+	}
+	_ = os.MkdirAll(dir, 0o755)
+	return dir
 }

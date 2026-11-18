@@ -68,14 +68,14 @@ connections:
   texture_lock:
     - {from: ppu0.engine_on, to: texld0.lock, desc: "textures are read-only once the render unit has started"}
 
-# tests: one frame per reset (spec/sprite-spec.md section 8). Each case loads bench/build/<workload>/app.elf into sram0, resets,
-# captures the frame from the VGA pins and compares it pixel by pixel with the golden model's (model/ppu_model.py). Build the
-# workloads first: make -C bench
+# tests: one frame per reset (spec/sprite-spec.md section 8), the hw-proj chip testbench (test-suite/ppu_bench). Each case builds
+# its workload and the golden frame in Go (workloads.go, model.go), loads the benchmark program (fw/bench) with the workload
+# written into it, resets, captures the frame from the VGA pins and compares it pixel by pixel; LATE and HIT too.
 tests:
   frame:
     empty_black:   {desc: "no sprite, black backdrop: the control case, right even with no renderer"}
     sprites_basic: {desc: "a scaled giant background, overlapping 4bpp and 8bpp sprites, flips, off-screen edges and hitboxes"}
-  # stress: each pushes one limit (model/workloads.py). A FAIL here is a result of the benchmark (a deadline the configuration
+  # stress: each pushes one limit (test-suite/ppu_bench/workloads.go). A FAIL here is a result of the benchmark (a deadline the configuration
   # misses: LATE > 0), not a broken test; the log line gives the load the workload asks for.
   stress:
     sparse:         {desc: "4 small sprites on the backdrop: the light case"}
@@ -84,7 +84,7 @@ tests:
     stack_16:       {desc: "16 sprites on the same pixels over the background: 17 deep"}
     bandwidth_8bpp: {desc: "6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels per sprite"}
     busy_screen:    {desc: "all 128 sprites: background and 127 random ones"}
-  # bench: ladders of one knob each (model/workloads.py); a version's capacity is the last step it passes. The category bench
+  # bench: ladders of one knob each (test-suite/ppu_bench/workloads.go); a version's capacity is the last step it passes (rtl-stat-job metrics). The category bench
   # is hw-proj's for tests about cost (guide/testbench-bench.md): rtl-stat-job submit --bench runs them alone, with profiles.
   bench:
     depth_4: {desc: "4 deep: 3 stacked 32x32 4bpp sprites over the background"}
