@@ -84,7 +84,7 @@ void _bsp_putc(char c);                        // weak; the chip's own code writ
 #define VGA_SCALE                1
 #define VGA_BITS                 12
 #define VGA_FORMAT               VGA_FORMAT_RGB444
-#define VGA_LEAD                 3
+#define VGA_LEAD                 6
 
 // Register offsets and field positions of the peripheral modules
 // --- GPIO registers ---

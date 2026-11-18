@@ -3,7 +3,7 @@
 
 // The shell of the Basys3 frame: FPGA-only logic with no physical pins. Its inputs are xdc ports of the same name
 // (clk: the 100 MHz oscillator, btnC: the centre button, active high), its outputs are what wiring.yaml names
-// (shell.sys_clk, shell.por_n). The chip runs at 100 MHz (system.yaml clk_pin freq_mhz), the board oscillator is
+// (shell.sys_clk, shell.por_n). The chip runs at 50 MHz (system.yaml clk_pin freq_mhz), the board oscillator is
 // 100 MHz: an MMCM divides it. MMCME2_BASE and BUFG are Xilinx primitives; the chip's RTL never instantiates them.
 
 module basys3_shell (
@@ -15,13 +15,14 @@ module basys3_shell (
 
 wire clkfb, clkfb_b, clk_div, locked;
 
-// VCO = 100 MHz * 10 / 1 = 1000 MHz (Artix-7 -1: 600..1200); CLKOUT0 = 1000 / 10.000 = 100 MHz
+// VCO = 100 MHz * 10 / 1 = 1000 MHz (Artix-7 -1: 600..1200); CLKOUT0 = 1000 / 20.000 = 50 MHz
+// (100 MHz did not close timing: Hazard3's fetch path to sram0 is 12.3 ns, ppu_bench commit 6d7ec08's Vivado run)
 MMCME2_BASE #(
     .BANDWIDTH        ("OPTIMIZED"),
     .CLKIN1_PERIOD    (10.0),
     .DIVCLK_DIVIDE    (1),
     .CLKFBOUT_MULT_F  (10.0),
-    .CLKOUT0_DIVIDE_F (10.000)
+    .CLKOUT0_DIVIDE_F (20.000)
 ) u_mmcm (
     .CLKIN1   (clk),
     .CLKFBIN  (clkfb_b),

@@ -56,12 +56,12 @@ func (t *T) Bw6(u *gen.PpuBench)     { oneFrame(u, "bw_6") }
 func (t *T) Bw8(u *gen.PpuBench)     { oneFrame(u, "bw_8") }
 func (t *T) Bw10(u *gen.PpuBench)    { oneFrame(u, "bw_10") }
 
-// The raster of the stream VGA block (guide/vga.md): 640x480@60 in 800 x 525, 4 chip cycles a pixel at 100 MHz.
+// The raster of the stream VGA block (guide/vga.md): 640x480@60 in 800 x 525, 2 chip cycles a pixel at 50 MHz (system.yaml).
 const (
 	screenW, screenH = 640, 480
 	lineCols         = 800
 	frameLines       = 525
-	cyclesPerPixel   = 4
+	cyclesPerPixel   = 2
 	lineCycles       = lineCols * cyclesPerPixel
 	hsyncCol         = 656    // hsync is low in columns 656..751
 	vsyncLine        = 490    // vsync is low in lines 490 and 491

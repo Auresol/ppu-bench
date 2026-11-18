@@ -5,7 +5,7 @@ chip: ppu_bench
 # clocks: where each clock comes from. A source is a pin of the chip, here named "clk"; the frame (the board) says what drives it.
 clocks:
   sources:
-    clk_pin: {type: pin, pin: clk, freq_mhz: 100}     # the name on the left is the source; pin: is the chip's pin
+    clk_pin: {type: pin, pin: clk, freq_mhz: 50}      # the name on the left is the source; pin: is the chip's pin
   domains:
     clk: {source: clk_pin}                          # one clock domain, called clk
 

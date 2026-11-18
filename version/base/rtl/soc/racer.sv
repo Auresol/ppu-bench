@@ -5,8 +5,8 @@
 // and tells you the pixel it will need: x, y (and active: it is inside the picture) are the pixel the beam shows LEAD pixels later
 // (lead: 1 in doc/vga.yaml). They go out to ppu0, which answers on pixel.
 //
-// Until ppu0 starts (use_ppu = ppu0.engine_on) the colour is racer's own bars. The block names x LEAD = 3 pixels ahead (doc/vga.yaml),
-// so the bar goes through three registers stepped at pix_stb (the last cycle of a pixel), as ppu0's three pipeline stages do:
+// Until ppu0 starts (use_ppu = ppu0.engine_on) the colour is racer's own bars. The block names x LEAD = 6 pixels ahead (doc/vga.yaml),
+// so the bar goes through six registers stepped at pix_stb (the last cycle of a pixel), as ppu0's six pipeline stages do:
 // both colours are the right one for the pixel on show, and the choice is a plain mux.
 
 `default_nettype none
@@ -27,7 +27,8 @@ module racer (
     output wire        pix_stb
 );
 
-reg [11:0] bars, bars_d1, bars_d2;   // three stages a pixel: lead 3, as ppu0's pipeline
+reg [11:0] bars;
+reg [11:0] bars_d [5];               // with bars, six stages: lead 6, as ppu0's pipeline
 
 // eight bars of 80 pixels: white, yellow, cyan, green, magenta, red, blue, black
 function automatic [11:0] bar(input [9:0] col);
@@ -45,9 +46,12 @@ endfunction
 
 always @(posedge clk or negedge rst_n)
     if (!rst_n) begin
-        bars_d1 <= 12'h000; bars_d2 <= 12'h000; bars <= 12'h000;
+        for (int i = 0; i < 5; i++) bars_d[i] <= 12'h000;
+        bars <= 12'h000;
     end else if (pix_stb) begin
-        bars_d1 <= bar(x); bars_d2 <= bars_d1; bars <= bars_d2;
+        bars_d[0] <= bar(x);
+        for (int i = 1; i < 5; i++) bars_d[i] <= bars_d[i-1];
+        bars <= bars_d[4];
     end
 
 vga u_vga (

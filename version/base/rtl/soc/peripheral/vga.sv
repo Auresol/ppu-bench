@@ -22,11 +22,11 @@ module vga (
 );
 
     // The picture and the raster (640x480@60, both syncs low)
-    // 640x480: 640 pixels a line, 480 lines, no RAM: the colour is the parent's wire, shown 1 x 1 times (100 MHz chip clock / 25 MHz = 4 cycles a pixel), lead 3 display pixels
+    // 640x480: 640 pixels a line, 480 lines, no RAM: the colour is the parent's wire, shown 1 x 1 times (50 MHz chip clock / 25 MHz = 2 cycles a pixel), lead 6 display pixels
     localparam SL     = 0;     // log2 of the scale
-    localparam PHW    = 2;     // bits of the phase counter
-    localparam [PHW-1:0] LASTPH = 3;  // the phase of the strobe cycle: cycles a pixel - 1
-    localparam [9:0]  FX0   = 3;     // the lead counter starts this many display pixels ahead of the beam (lead:)
+    localparam PHW    = 1;     // bits of the phase counter
+    localparam [PHW-1:0] LASTPH = 1;  // the phase of the strobe cycle: cycles a pixel - 1
+    localparam [9:0]  FX0   = 6;     // the lead counter starts this many display pixels ahead of the beam (lead:)
     localparam [9:0]  HA    = 640;   // active columns
     localparam [9:0]  HSS   = 656;   // first column of hsync
     localparam [9:0]  HSE   = 752;   // first column after hsync

@@ -26,7 +26,7 @@
 .equ VGA_SCALE, 1
 .equ VGA_BITS, 12
 .equ VGA_FORMAT, 2
-.equ VGA_LEAD, 3
+.equ VGA_LEAD, 6
 
 /* Register offsets and field positions of the modules */
 .equ PPU_CTRL, 0x000
