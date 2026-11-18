@@ -92,6 +92,7 @@ float ppu_sin(float x);                      // |error| < 1e-6
 float ppu_cos(float x);
 float ppu_wrap_pi(float a);                  // into -pi .. pi
 int   ppu_round(float f);
+uint32_t ppu_isqrt(uint32_t v);              // floor(sqrt(v)), integer only (about 16 steps)
 uint32_t rnd(void);                          // xorshift32, fixed seed
 int      rnd_range(int lo, int hi);          // lo .. hi-1
 int      rect_overlap(int ax, int ay, int aw, int ah, int bx, int by, int bw, int bh);

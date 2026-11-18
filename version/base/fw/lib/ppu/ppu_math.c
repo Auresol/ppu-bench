@@ -20,6 +20,18 @@ float ppu_sin(float x)
 float ppu_cos(float x) { return ppu_sin(x + PPU_PI / 2); }
 int   ppu_round(float f) { return (int)(f < 0 ? f - 0.5f : f + 0.5f); }
 
+uint32_t ppu_isqrt(uint32_t v)       // bit by bit: one result bit a step, no multiply
+{
+    uint32_t r = 0, bit = 1u << 30;
+    while (bit > v) bit >>= 2;
+    while (bit) {
+        if (v >= r + bit) { v -= r + bit; r = (r >> 1) + bit; }
+        else r >>= 1;
+        bit >>= 2;
+    }
+    return r;
+}
+
 static uint32_t rnd_state = 0x2545F491u;
 uint32_t rnd(void)
 {
