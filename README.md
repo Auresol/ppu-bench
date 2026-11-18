@@ -71,17 +71,17 @@ Block RAM is 34.5 of 50 tiles (69%) in every version.
 
 `random_scene` draws a whole scene per seed: 16 to 127 sprites of seven kinds (8×8 tiles up to 64×64 8bpp discs), anywhere
 on the screen, with random palettes, priorities, flips and hitboxes. Every version runs the same 256 scenes, each checked
-pixel-exact. Across them: at most 6 deep, the busiest line 9.8 sprites on average and 20 at most, bus main 18% busy.
+pixel-exact. Across them: at most 6 deep, the busiest line 9.8 sprites on average and 20 at most.
 
-| Version | Slots | Tex bus | Perfect | Late px, mean | Median | 99th pct | Worst | Tex bus busy |
-|---|---|---|---|---|---|---|---|---|
-| base | 8 | 32 | 5 / 256 | 866 | 636 | 3,672 | 3,929 | 8.9% |
-| slots16 | 16 | 32 | 5 / 256 | 976 | 699 | 3,854 | 4,281 | 8.9% |
-| slots24 | 24 | 32 | 5 / 256 | 976 | 699 | 3,784 | 4,279 | 8.9% |
-| tex64 | 8 | 64 | 255 / 256 | 0.1 | 0 | 0 | 16 | 4.5% |
-| slots24-tex64 | 24 | 64 | 255 / 256 | 0.1 | 0 | 0 | 16 | 4.5% |
-| tex128 | 8 | 128 | 256 / 256 | 0 | 0 | 0 | 0 | 2.3% |
-| slots24-tex128 | 24 | 128 | 256 / 256 | 0 | 0 | 0 | 0 | 2.3% |
+| Version | Slots | Tex bus | Perfect | Late px, mean | Median | 99th pct | Worst |
+|---|---|---|---|---|---|---|---|
+| base | 8 | 32 | 5 / 256 | 866 | 636 | 3,672 | 3,929 |
+| slots16 | 16 | 32 | 5 / 256 | 976 | 699 | 3,854 | 4,281 |
+| slots24 | 24 | 32 | 5 / 256 | 976 | 699 | 3,784 | 4,279 |
+| tex64 | 8 | 64 | 255 / 256 | 0.1 | 0 | 0 | 16 |
+| slots24-tex64 | 24 | 64 | 255 / 256 | 0.1 | 0 | 0 | 16 |
+| tex128 | 8 | 128 | 256 / 256 | 0 | 0 | 0 | 0 |
+| slots24-tex128 | 24 | 128 | 256 / 256 | 0 | 0 | 0 | 0 |
 
 Slots make no difference on these scenes; the bus width decides. The one miss on 64 bits is seed 39 (109 sprites): 16 late
 pixels from (36, 140), a short bandwidth burst, drawn correctly on 128 bits. Replay it with
