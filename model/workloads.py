@@ -14,6 +14,10 @@ stack_16       16 sprites on the same pixels over the background: 17 deep, more 
 bandwidth_8bpp 6 overlapping 64x64 8bpp sprites over the background: few enough slots, but each slot needs a texture word
                every 4 pixels: the texture bus's bandwidth is the limit
 busy_screen    all 128 sprites: the background and 127 random ones (sizes, depths, flips, palettes, hitboxes; seed fixed)
+
+Sweeps (one knob a ladder; a version's capacity is the last step it passes):
+depth_N        N deep: N-1 stacked 32x32 4bpp sprites over the background, N = 4 .. 24
+bw_N           N overlapping 64x64 8bpp sprites over the background, N = 2 .. 10
 """
 
 import random
@@ -195,5 +199,42 @@ def busy_screen():
     return wl
 
 
+# ---- sweeps: one knob per ladder, so each version gets a capacity (the last step it passes), not one pass or fail ----
+DEPTH_STEPS = (4, 8, 12, 16, 20, 24)
+BW_STEPS = (2, 4, 6, 8, 10)
+
+
+def _depth(n):
+    """n deep with the background: n-1 32x32 4bpp discs stacked 1 pixel apart. Each step adds n slots and n/8 words a pixel."""
+    def make():
+        wl = Workload(f"depth_{n}", f"{n - 1} stacked 32x32 4bpp sprites over the background: {n} deep")
+        _palette(wl)
+        bg_tex = _background(wl)
+        disc32 = wl.texture(32, 32, bpp8=False, pixel=_disc(16))
+        for i in range(n - 1):
+            wl.sprite(disc32, 300 + i, 200 + i, pal=1 + i % 3, prio=i % 3)
+        wl.sprite(bg_tex, 0, 0, prio=3, giant=True, index=127)
+        return wl
+    make.__name__ = f"depth_{n}"
+    return make
+
+
+def _bw(n):
+    """n overlapping 64x64 8bpp sprites over the background: a texture word every 4 pixels each, so bandwidth climbs fastest."""
+    def make():
+        wl = Workload(f"bw_{n}", f"{n} overlapping 64x64 8bpp sprites over the background")
+        _palette(wl)
+        bg_tex = _background(wl)
+        ramp = wl.texture(64, 64, bpp8=True, pixel=lambda u, v: 64 + (u * 3 + v * 5) % 192)
+        for i in range(n):
+            wl.sprite(ramp, 200 + 4 * i, 200 + 4 * i, prio=i % 3, hflip=bool(i & 1))
+        wl.sprite(bg_tex, 0, 0, prio=3, giant=True, index=127)
+        return wl
+    make.__name__ = f"bw_{n}"
+    return make
+
+
+SWEEP = [_depth(n) for n in DEPTH_STEPS] + [_bw(n) for n in BW_STEPS]
+
 WORKLOADS = {f.__name__: f for f in (empty_black, sprites_basic, sparse, line_storm, stack_7, stack_16, bandwidth_8bpp,
-                                     busy_screen)}
+                                     busy_screen, *SWEEP)}

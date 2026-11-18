@@ -3,7 +3,7 @@
 // Each case loads bench/build/<workload>/app.elf into sram0 through the backdoor (the program runs from RAM: there is no
 // flash and no boot ROM, so hw-proj's firmware: cases do not apply), resets the chip, captures the picture from the VGA
 // pins, finds the frame the render unit drew and compares it pixel by pixel with the golden model's (model/build.py),
-// then checks LATE and the hit bits the firmware read back. Build the workloads first: make -C bench.
+// then checks LATE and the hit bits the firmware read back. Each case builds its workload first (make -C bench).
 //
 // The capture holds a frame in the testbench, never in the chip: the chip streams each pixel once on its pins.
 package ppubench
@@ -17,6 +17,7 @@ import (
 	"image/color"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -41,6 +42,19 @@ func (t *T) Stack16(u *gen.PpuBench)       { oneFrame(u, "stack_16") }
 func (t *T) Bandwidth8bpp(u *gen.PpuBench) { oneFrame(u, "bandwidth_8bpp") }
 func (t *T) BusyScreen(u *gen.PpuBench)    { oneFrame(u, "busy_screen") }
 
+// sweep: the depth and bandwidth ladders (model/workloads.py)
+func (t *T) Depth4(u *gen.PpuBench)  { oneFrame(u, "depth_4") }
+func (t *T) Depth8(u *gen.PpuBench)  { oneFrame(u, "depth_8") }
+func (t *T) Depth12(u *gen.PpuBench) { oneFrame(u, "depth_12") }
+func (t *T) Depth16(u *gen.PpuBench) { oneFrame(u, "depth_16") }
+func (t *T) Depth20(u *gen.PpuBench) { oneFrame(u, "depth_20") }
+func (t *T) Depth24(u *gen.PpuBench) { oneFrame(u, "depth_24") }
+func (t *T) Bw2(u *gen.PpuBench)     { oneFrame(u, "bw_2") }
+func (t *T) Bw4(u *gen.PpuBench)     { oneFrame(u, "bw_4") }
+func (t *T) Bw6(u *gen.PpuBench)     { oneFrame(u, "bw_6") }
+func (t *T) Bw8(u *gen.PpuBench)     { oneFrame(u, "bw_8") }
+func (t *T) Bw10(u *gen.PpuBench)    { oneFrame(u, "bw_10") }
+
 // The raster of the stream VGA block (guide/vga.md): 640x480@60 in 800 x 525, 4 chip cycles a pixel at 100 MHz.
 const (
 	screenW, screenH = 640, 480
@@ -48,9 +62,9 @@ const (
 	frameLines       = 525
 	cyclesPerPixel   = 4
 	lineCycles       = lineCols * cyclesPerPixel
-	hsyncCol         = 656 // hsync is low in columns 656..751
-	vsyncLine        = 490 // vsync is low in lines 490 and 491
-	maxFrames        = 4   // frames to wait for DONE before giving up
+	hsyncCol         = 656    // hsync is low in columns 656..751
+	vsyncLine        = 490    // vsync is low in lines 490 and 491
+	maxFrames        = 4      // frames to wait for DONE before giving up
 	bspCrashAddr     = 0xFFD0 // BSP_CRASH_ADDR of fw/soc.h
 )
 
@@ -79,21 +93,40 @@ type expected struct {
 		MaxPerLine int   `json:"max_per_line"`
 		LineAt     int   `json:"max_per_line_at"`
 	} `json:"load"`
-	frame    []uint16
+	frame []uint16
 }
 
 // result is struct bench_result of bench/main.c, read through the backdoor.
 type result struct {
 	late, done uint32
 	hit        [4]uint32
+	perf       perf
+}
+
+// perf are the render unit's counters of the frame (doc/ppu.yaml, FRAME_CYC .. TEX_WANT_PEAK).
+type perf struct {
+	FrameCyc    uint32 `json:"frame_cycles"`
+	TexBusy     uint32 `json:"tex_busy_cycles"`
+	MainBusy    uint32 `json:"main_busy_cycles"`
+	SlotsPeak   uint32 `json:"slots_peak"`
+	AdmWait     uint32 `json:"adm_wait_cycles"`
+	AdmSlack    int32  `json:"adm_slack_pixels"` // 0x7FFF: admission never trailed the beam
+	TexWantPeak uint32 `json:"tex_want_peak"`
 }
 
 func oneFrame(u *gen.PpuBench, workload string) {
 	s := u.Sim
-	dir := filepath.Join(repoRoot(s), "bench", "build", workload)
+	root := repoRoot(s)
+	dir := filepath.Join(root, "bench", "build", workload)
 	elfPath := filepath.Join(dir, "app.elf")
+	// the workload (golden frame, firmware) is built here when it is missing or stale: bench/build is not in git, so a job's
+	// fresh worktree has none. make is a no-op when it is up to date.
+	if out, err := exec.Command("make", "-C", filepath.Join(root, "bench"), "WORKLOADS="+workload).CombinedOutput(); err != nil {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		s.Fatalf("%s: make -C bench WORKLOADS=%s: %v; last output:\n%s", workload, workload, err, strings.Join(lines[max(0, len(lines)-15):], "\n"))
+	}
 	if _, err := os.Stat(elfPath); err != nil {
-		s.Fatalf("%s: no %s: build the workloads first (make -C bench)", workload, elfPath)
+		s.Fatalf("%s: no %s after make -C bench", workload, elfPath)
 	}
 	want := loadExpected(s, dir)
 
@@ -108,7 +141,9 @@ func oneFrame(u *gen.PpuBench, workload string) {
 	resAddr := symbol(s, elfPath, "bench_result")
 	readResult := func() result {
 		w := func(off uint64) uint32 { return uint32(sram.Read(int((resAddr + off) / 4))) }
-		return result{late: w(0), hit: [4]uint32{w(4), w(8), w(12), w(16)}, done: w(20)}
+		return result{late: w(0), hit: [4]uint32{w(4), w(8), w(12), w(16)}, done: w(20), perf: perf{
+			FrameCyc: w(24), TexBusy: w(28), MainBusy: w(32), SlotsPeak: w(36), AdmWait: w(40), AdmSlack: int32(w(44)),
+			TexWantPeak: w(48)}}
 	}
 	u.Reset()
 
@@ -137,6 +172,17 @@ func oneFrame(u *gen.PpuBench, workload string) {
 		workload, bad, len(got), res.late, l.Sprites, l.MaxDepth, l.DepthAt, l.MaxPerLine, l.LineAt, gotPNG)
 	u.Metric("load_max_depth", int64(l.MaxDepth))
 	u.Metric("load_max_per_line", int64(l.MaxPerLine))
+	p := res.perf
+	pct := func(n uint32) float64 { return 100 * float64(n) / float64(max(p.FrameCyc, 1)) }
+	u.Metric("tex_busy_pct_x100", int64(pct(p.TexBusy)*100))
+	u.Metric("main_busy_pct_x100", int64(pct(p.MainBusy)*100))
+	u.Metric("slots_peak", int64(p.SlotsPeak))
+	u.Metric("adm_wait_cycles", int64(p.AdmWait))
+	u.Metric("adm_slack_pixels", int64(p.AdmSlack))
+	u.Metric("tex_want_peak", int64(p.TexWantPeak))
+	s.Logf("%s: bus tex busy %.1f%%, bus main busy %.1f%%, slots peak %d, admission waited %d cycles, admission slack %d px, "+
+		"fetch queue peak %d", workload, pct(p.TexBusy), pct(p.MainBusy), p.SlotsPeak, p.AdmWait, p.AdmSlack, p.TexWantPeak)
+	writeResult(s, workload, bad, res, want)
 	if bad > 0 {
 		s.Errorf("frame: %d pixels differ from the golden model; first: %v (see %s and expected.png)", bad, first, gotPNG)
 	}
@@ -254,6 +300,33 @@ func checkTextures(u *gen.PpuBench, dir string) {
 			s.Errorf("tex0 byte 0x%x = %02x, want %02x: the texture loader did not write the image intact", i, got[i], want[i])
 			return
 		}
+	}
+}
+
+// writeResult writes bench/build/results/<version>/<workload>.json: the verdict, the load and the counters of one run, for
+// tables across versions (bench/results.py). The version is read from the test binary's path (build/versions/<v>/...).
+func writeResult(s *tb.Sim, workload string, bad int, res result, want expected) {
+	version := "base"
+	if exe, err := os.Executable(); err == nil {
+		parts := strings.Split(filepath.ToSlash(exe), "/")
+		for i := 0; i+1 < len(parts); i++ {
+			if parts[i] == "versions" {
+				version = parts[i+1]
+			}
+		}
+	}
+	dir := filepath.Join(repoRoot(s), "bench", "build", "results", version)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		s.Errorf("%v", err)
+		return
+	}
+	out := map[string]any{
+		"version": version, "workload": workload, "pass": bad == 0 && res.late == 0, "bad_pixels": bad, "late_pixels": res.late,
+		"load": want.Load, "perf": res.perf,
+	}
+	b, _ := json.MarshalIndent(out, "", " ")
+	if err := os.WriteFile(filepath.Join(dir, workload+".json"), b, 0o644); err != nil {
+		s.Errorf("%v", err)
 	}
 }
 

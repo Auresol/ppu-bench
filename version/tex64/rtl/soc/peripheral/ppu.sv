@@ -66,14 +66,21 @@ module ppu #(
     wire wen_giant;  // write enable of GIANT
 
     // Register field wires: read them in your logic, drive the ones marked
-    wire         ctrl_start;    // CTRL.START [0:0] wf, strobe wen_ctrl
-    wire         status_done;   // STATUS.DONE [0:0] ro, drive it in your logic
-    wire         status_busy;   // STATUS.BUSY [1:1] ro, drive it in your logic
-    wire [31:0]  late_count;    // LATE.COUNT [31:0] ro, drive it in your logic
-    wire [9:0]   giant_w;       // GIANT.W [9:0] rw
-    wire [9:0]   giant_h;       // GIANT.H [19:10] rw
-    wire         giant_scale2;  // GIANT.SCALE2 [20:20] rw
-    wire [127:0] hit_bits;      // HIT%s.BITS [31:0] ro (dim=4 array), drive it in your logic
+    wire         ctrl_start;           // CTRL.START [0:0] wf, strobe wen_ctrl
+    wire         status_done;          // STATUS.DONE [0:0] ro, drive it in your logic
+    wire         status_busy;          // STATUS.BUSY [1:1] ro, drive it in your logic
+    wire [31:0]  late_count;           // LATE.COUNT [31:0] ro, drive it in your logic
+    wire [9:0]   giant_w;              // GIANT.W [9:0] rw
+    wire [9:0]   giant_h;              // GIANT.H [19:10] rw
+    wire         giant_scale2;         // GIANT.SCALE2 [20:20] rw
+    wire [31:0]  frame_cyc_count;      // FRAME_CYC.COUNT [31:0] ro, drive it in your logic
+    wire [31:0]  tex_busy_count;       // TEX_BUSY.COUNT [31:0] ro, drive it in your logic
+    wire [31:0]  main_busy_count;      // MAIN_BUSY.COUNT [31:0] ro, drive it in your logic
+    wire [31:0]  slots_peak_count;     // SLOTS_PEAK.COUNT [31:0] ro, drive it in your logic
+    wire [31:0]  adm_wait_count;       // ADM_WAIT.COUNT [31:0] ro, drive it in your logic
+    wire [31:0]  adm_slack_pixels;     // ADM_SLACK.PIXELS [31:0] ro, drive it in your logic
+    wire [31:0]  tex_want_peak_count;  // TEX_WANT_PEAK.COUNT [31:0] ro, drive it in your logic
+    wire [127:0] hit_bits;             // HIT%s.BITS [31:0] ro (dim=4 array), drive it in your logic
 
     // Field flops
     reg  [9:0] reg_giant_w;
@@ -149,6 +156,27 @@ module ppu #(
                     bus_rdata[9:0] = giant_w;
                     bus_rdata[19:10] = giant_h;
                     bus_rdata[20:20] = giant_scale2;
+                end
+                12'h040: begin
+                    bus_rdata[31:0] = frame_cyc_count;
+                end
+                12'h044: begin
+                    bus_rdata[31:0] = tex_busy_count;
+                end
+                12'h048: begin
+                    bus_rdata[31:0] = main_busy_count;
+                end
+                12'h04C: begin
+                    bus_rdata[31:0] = slots_peak_count;
+                end
+                12'h050: begin
+                    bus_rdata[31:0] = adm_wait_count;
+                end
+                12'h054: begin
+                    bus_rdata[31:0] = adm_slack_pixels;
+                end
+                12'h058: begin
+                    bus_rdata[31:0] = tex_want_peak_count;
                 end
                 12'h010: begin
                     bus_rdata[31:0] = hit_bits[31:0];
@@ -744,6 +772,48 @@ assign late_count = late_r;
 assign hit_bits   = hit_r;
 
 // racer0 names (x, y, active) too; this unit keeps its own count of the same raster (cx, cy)
+// ---------------------------------------------------------------------------------------------------------------------------
+// Performance counters (doc/ppu.yaml, FRAME_CYC .. TEX_WANT_PEAK): only while the frame renders (E_RUN)
+// ---------------------------------------------------------------------------------------------------------------------------
+logic [31:0] pc_frame, pc_tex, pc_main, pc_admwait;
+logic [7:0]  pc_slots_peak, pc_want_peak;
+logic signed [15:0] pc_slack;
+// n_cover: slots covering the pixel S0 is making (the depth the picture needs there); not the slots holding a sprite, which
+// admission fills ahead of the beam whenever it can, so that count says only that slots run full
+logic [7:0]  n_cover, n_want;
+always_comb begin
+    n_cover = '0; n_want = '0;
+    for (int s = 0; s < A; s++) begin
+        n_cover = n_cover + 8'(c_cov[s]);
+        n_want  = n_want + 8'(b_want[s]);
+    end
+end
+// the admission frontier ahead of the pixel being made, on a line still being admitted: (first bin not done) * 16 - column
+wire signed [15:0] slack_now = $signed({6'd0, ad_b, 4'b0000}) - $signed({6'd0, cx});
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        pc_frame <= '0; pc_tex <= '0; pc_main <= '0; pc_admwait <= '0;
+        pc_slots_peak <= '0; pc_want_peak <= '0; pc_slack <= 16'sh7FFF;
+    end else if (est == E_RUN) begin
+        pc_frame <= pc_frame + 32'd1;
+        if (bph != 2'd0)               pc_tex     <= pc_tex + 32'd1;
+        if (aph_data || a_issue)       pc_main    <= pc_main + 32'd1;
+        if (ads == AD_LOAD && !have_free) pc_admwait <= pc_admwait + 32'd1;
+        if (pix_stb && n_cover > pc_slots_peak) pc_slots_peak <= n_cover;
+        if (n_want > pc_want_peak)     pc_want_peak  <= n_want;
+        if (pix_stb && frame_px && adm_active && L == cy[8:0] && slack_now < pc_slack) pc_slack <= slack_now;
+    end
+end
+
+assign frame_cyc_count     = pc_frame;
+assign tex_busy_count      = pc_tex;
+assign main_busy_count     = pc_main;
+assign slots_peak_count    = {24'd0, pc_slots_peak};
+assign adm_wait_count      = pc_admwait;
+assign adm_slack_pixels    = 32'(pc_slack);
+assign tex_want_peak_count = {24'd0, pc_want_peak};
+
 // a_tex[13]: textures past 256 kb, beyond any tex0; pal_word[31:28, 15:12]: the unused top bits of the 16-bit entries
 wire _unused_renderer = &{1'b0, x, y, active, a_hresp, b_hresp, a_v, ad_w1[31:21], ad_w0[28], ev_w0[31:29], a_tex[13],
                          pal_word[31:28], pal_word[15:12]};

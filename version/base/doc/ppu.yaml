@@ -53,3 +53,39 @@ registers:
     reset: 0x00000000
     fields:
       - {name: BITS, bits: [31, 0], access: ro, desc: "hit bit of sprites 32n .. 32n+31 (spec section 7)"}
+  # performance counters (spec section 9): counted only while the frame renders (from its frame start to the blanking after line 479)
+  - name: FRAME_CYC
+    offset: 0x040
+    reset: 0x00000000
+    fields:
+      - {name: COUNT, bits: [31, 0], access: ro, desc: "cycles of the rendered frame (the denominator of the others)"}
+  - name: TEX_BUSY
+    offset: 0x044
+    reset: 0x00000000
+    fields:
+      - {name: COUNT, bits: [31, 0], access: ro, desc: "cycles with a bus tex transfer in flight"}
+  - name: MAIN_BUSY
+    offset: 0x048
+    reset: 0x00000000
+    fields:
+      - {name: COUNT, bits: [31, 0], access: ro, desc: "cycles the render unit used bus main (evaluation and admission)"}
+  - name: SLOTS_PEAK
+    offset: 0x04C
+    reset: 0x00000000
+    fields:
+      - {name: COUNT, bits: [31, 0], access: ro, desc: "most slots covering one pixel (the depth the frame needed, as the hardware saw it)"}
+  - name: ADM_WAIT
+    offset: 0x050
+    reset: 0x00000000
+    fields:
+      - {name: COUNT, bits: [31, 0], access: ro, desc: "cycles admission waited for a free slot"}
+  - name: ADM_SLACK
+    offset: 0x054
+    reset: 0x00007FFF
+    fields:
+      - {name: PIXELS, bits: [31, 0], access: ro, desc: "smallest margin (signed, pixels) of the admission frontier ahead of the pixel being made, on lines still being admitted; 0x7FFF when admission never trailed the beam"}
+  - name: TEX_WANT_PEAK
+    offset: 0x058
+    reset: 0x00000000
+    fields:
+      - {name: COUNT, bits: [31, 0], access: ro, desc: "most slots waiting for a texture word at once"}

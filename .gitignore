@@ -7,3 +7,4 @@ bench/build/
 __pycache__/
 version/base/fw/app.elf
 version/base/fw/app.bin
+.toolchain.lock

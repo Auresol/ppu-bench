@@ -102,6 +102,13 @@ void _bsp_putc(char c);                        // weak; the chip's own code writ
 #define PPU_HIT1                         0x014
 #define PPU_HIT2                         0x018
 #define PPU_HIT3                         0x01C
+#define PPU_FRAME_CYC                    0x040
+#define PPU_TEX_BUSY                     0x044
+#define PPU_MAIN_BUSY                    0x048
+#define PPU_SLOTS_PEAK                   0x04C
+#define PPU_ADM_WAIT                     0x050
+#define PPU_ADM_SLACK                    0x054
+#define PPU_TEX_WANT_PEAK                0x058
 
 // --- PPU fields ---
 #define PPU_CTRL_START_POS                       0
@@ -126,6 +133,20 @@ void _bsp_putc(char c);                        // weak; the chip's own code writ
 #define PPU_HIT2_BITS_MASK                       0xFFFFFFFFU
 #define PPU_HIT3_BITS_POS                        0
 #define PPU_HIT3_BITS_MASK                       0xFFFFFFFFU
+#define PPU_FRAME_CYC_COUNT_POS                  0
+#define PPU_FRAME_CYC_COUNT_MASK                 0xFFFFFFFFU
+#define PPU_TEX_BUSY_COUNT_POS                   0
+#define PPU_TEX_BUSY_COUNT_MASK                  0xFFFFFFFFU
+#define PPU_MAIN_BUSY_COUNT_POS                  0
+#define PPU_MAIN_BUSY_COUNT_MASK                 0xFFFFFFFFU
+#define PPU_SLOTS_PEAK_COUNT_POS                 0
+#define PPU_SLOTS_PEAK_COUNT_MASK                0xFFFFFFFFU
+#define PPU_ADM_WAIT_COUNT_POS                   0
+#define PPU_ADM_WAIT_COUNT_MASK                  0xFFFFFFFFU
+#define PPU_ADM_SLACK_PIXELS_POS                 0
+#define PPU_ADM_SLACK_PIXELS_MASK                0xFFFFFFFFU
+#define PPU_TEX_WANT_PEAK_COUNT_POS              0
+#define PPU_TEX_WANT_PEAK_COUNT_MASK             0xFFFFFFFFU
 
 // Register access
 #define REG32(base, offset)  (*(volatile uint32_t *)((base) + (offset)))
@@ -139,6 +160,13 @@ void _bsp_putc(char c);                        // weak; the chip's own code writ
 #define PPU0_HIT1                        REG32(PPU0_BASE, PPU_HIT1)
 #define PPU0_HIT2                        REG32(PPU0_BASE, PPU_HIT2)
 #define PPU0_HIT3                        REG32(PPU0_BASE, PPU_HIT3)
+#define PPU0_FRAME_CYC                   REG32(PPU0_BASE, PPU_FRAME_CYC)
+#define PPU0_TEX_BUSY                    REG32(PPU0_BASE, PPU_TEX_BUSY)
+#define PPU0_MAIN_BUSY                   REG32(PPU0_BASE, PPU_MAIN_BUSY)
+#define PPU0_SLOTS_PEAK                  REG32(PPU0_BASE, PPU_SLOTS_PEAK)
+#define PPU0_ADM_WAIT                    REG32(PPU0_BASE, PPU_ADM_WAIT)
+#define PPU0_ADM_SLACK                   REG32(PPU0_BASE, PPU_ADM_SLACK)
+#define PPU0_TEX_WANT_PEAK               REG32(PPU0_BASE, PPU_TEX_WANT_PEAK)
 
 // Pin functions: FUNCSEL numbers and the pins of each group
 #define FUNCSEL_RACER0                   1

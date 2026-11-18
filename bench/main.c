@@ -12,6 +12,8 @@ struct bench_result {
     uint32_t late;         // PPU0_LATE after the frame
     uint32_t hit[4];       // PPU0_HIT0..3
     uint32_t done;         // written last: 1 = the fields above are final
+    // the performance counters of the frame (doc/ppu.yaml FRAME_CYC .. TEX_WANT_PEAK), in register order
+    uint32_t frame_cyc, tex_busy, main_busy, slots_peak, adm_wait, adm_slack, tex_want_peak;
 };
 
 volatile struct bench_result bench_result;
@@ -41,6 +43,14 @@ int main(void)
     bench_result.hit[1] = PPU0_HIT1;
     bench_result.hit[2] = PPU0_HIT2;
     bench_result.hit[3] = PPU0_HIT3;
+    bench_result.frame_cyc     = PPU0_FRAME_CYC;
+    bench_result.tex_busy      = PPU0_TEX_BUSY;
+    bench_result.main_busy     = PPU0_MAIN_BUSY;
+    bench_result.slots_peak    = PPU0_SLOTS_PEAK;
+    bench_result.adm_wait      = PPU0_ADM_WAIT;
+    bench_result.adm_slack     = PPU0_ADM_SLACK;
+    bench_result.tex_want_peak = PPU0_TEX_WANT_PEAK;
+    __asm__ volatile("" ::: "memory");   // every field above is stored before done
     bench_result.done = 1u;
     return 0;
 }
