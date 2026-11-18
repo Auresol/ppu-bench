@@ -84,8 +84,9 @@ tests:
     stack_16:       {desc: "16 sprites on the same pixels over the background: 17 deep"}
     bandwidth_8bpp: {desc: "6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels per sprite"}
     busy_screen:    {desc: "all 128 sprites: background and 127 random ones"}
-  # sweep: ladders of one knob each (model/workloads.py); a version's capacity is the last step it passes (bench/results.py)
-  sweep:
+  # bench: ladders of one knob each (model/workloads.py); a version's capacity is the last step it passes. The category bench
+  # is hw-proj's for tests about cost (guide/testbench-bench.md): rtl-stat-job submit --bench runs them alone, with profiles.
+  bench:
     depth_4: {desc: "4 deep: 3 stacked 32x32 4bpp sprites over the background"}
     depth_8: {desc: "8 deep: 7 stacked 32x32 4bpp sprites over the background"}
     depth_12: {desc: "12 deep: 11 stacked 32x32 4bpp sprites over the background"}

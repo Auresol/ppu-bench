@@ -12,6 +12,28 @@ import (
 
 // PpuBenchTests is every test doc/ppu_bench.yaml declares; your type implements it.
 type PpuBenchTests interface {
+	// bench/bw_10: 10 overlapping 64x64 8bpp sprites over the background
+	Bw10(u *PpuBench)
+	// bench/bw_2: 2 overlapping 64x64 8bpp sprites over the background
+	Bw2(u *PpuBench)
+	// bench/bw_4: 4 overlapping 64x64 8bpp sprites over the background
+	Bw4(u *PpuBench)
+	// bench/bw_6: 6 overlapping 64x64 8bpp sprites over the background
+	Bw6(u *PpuBench)
+	// bench/bw_8: 8 overlapping 64x64 8bpp sprites over the background
+	Bw8(u *PpuBench)
+	// bench/depth_12: 12 deep: 11 stacked 32x32 4bpp sprites over the background
+	Depth12(u *PpuBench)
+	// bench/depth_16: 16 deep: 15 stacked 32x32 4bpp sprites over the background
+	Depth16(u *PpuBench)
+	// bench/depth_20: 20 deep: 19 stacked 32x32 4bpp sprites over the background
+	Depth20(u *PpuBench)
+	// bench/depth_24: 24 deep: 23 stacked 32x32 4bpp sprites over the background
+	Depth24(u *PpuBench)
+	// bench/depth_4: 4 deep: 3 stacked 32x32 4bpp sprites over the background
+	Depth4(u *PpuBench)
+	// bench/depth_8: 8 deep: 7 stacked 32x32 4bpp sprites over the background
+	Depth8(u *PpuBench)
 	// frame/empty_black: no sprite, black backdrop: the control case, right even with no renderer
 	EmptyBlack(u *PpuBench)
 	// frame/sprites_basic: a scaled giant background, overlapping 4bpp and 8bpp sprites, flips, off-screen edges and hitboxes
@@ -28,49 +50,11 @@ type PpuBenchTests interface {
 	Stack16(u *PpuBench)
 	// stress/stack_7: 7 sprites on the same pixels over the background: 8 deep
 	Stack7(u *PpuBench)
-	// sweep/bw_10: 10 overlapping 64x64 8bpp sprites over the background
-	Bw10(u *PpuBench)
-	// sweep/bw_2: 2 overlapping 64x64 8bpp sprites over the background
-	Bw2(u *PpuBench)
-	// sweep/bw_4: 4 overlapping 64x64 8bpp sprites over the background
-	Bw4(u *PpuBench)
-	// sweep/bw_6: 6 overlapping 64x64 8bpp sprites over the background
-	Bw6(u *PpuBench)
-	// sweep/bw_8: 8 overlapping 64x64 8bpp sprites over the background
-	Bw8(u *PpuBench)
-	// sweep/depth_12: 12 deep: 11 stacked 32x32 4bpp sprites over the background
-	Depth12(u *PpuBench)
-	// sweep/depth_16: 16 deep: 15 stacked 32x32 4bpp sprites over the background
-	Depth16(u *PpuBench)
-	// sweep/depth_20: 20 deep: 19 stacked 32x32 4bpp sprites over the background
-	Depth20(u *PpuBench)
-	// sweep/depth_24: 24 deep: 23 stacked 32x32 4bpp sprites over the background
-	Depth24(u *PpuBench)
-	// sweep/depth_4: 4 deep: 3 stacked 32x32 4bpp sprites over the background
-	Depth4(u *PpuBench)
-	// sweep/depth_8: 8 deep: 7 stacked 32x32 4bpp sprites over the background
-	Depth8(u *PpuBench)
 }
 
 // PpuBenchDefaults implements every declared test as not written, and a test with firmware: as boot and run to the verdict. Embed it
 // in your type and override the tests you write.
 type PpuBenchDefaults struct{}
-
-func (PpuBenchDefaults) EmptyBlack(u *PpuBench) { u.Sim.NotWritten() }
-
-func (PpuBenchDefaults) SpritesBasic(u *PpuBench) { u.Sim.NotWritten() }
-
-func (PpuBenchDefaults) Bandwidth8bpp(u *PpuBench) { u.Sim.NotWritten() }
-
-func (PpuBenchDefaults) BusyScreen(u *PpuBench) { u.Sim.NotWritten() }
-
-func (PpuBenchDefaults) LineStorm(u *PpuBench) { u.Sim.NotWritten() }
-
-func (PpuBenchDefaults) Sparse(u *PpuBench) { u.Sim.NotWritten() }
-
-func (PpuBenchDefaults) Stack16(u *PpuBench) { u.Sim.NotWritten() }
-
-func (PpuBenchDefaults) Stack7(u *PpuBench) { u.Sim.NotWritten() }
 
 func (PpuBenchDefaults) Bw10(u *PpuBench) { u.Sim.NotWritten() }
 
@@ -94,11 +78,49 @@ func (PpuBenchDefaults) Depth4(u *PpuBench) { u.Sim.NotWritten() }
 
 func (PpuBenchDefaults) Depth8(u *PpuBench) { u.Sim.NotWritten() }
 
+func (PpuBenchDefaults) EmptyBlack(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) SpritesBasic(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Bandwidth8bpp(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) BusyScreen(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) LineStorm(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Sparse(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Stack16(u *PpuBench) { u.Sim.NotWritten() }
+
+func (PpuBenchDefaults) Stack7(u *PpuBench) { u.Sim.NotWritten() }
+
 // PpuBenchEnvTests is PpuBenchTests for a module with an environment (adr/testbench-worlds/). Env is called for every case, after the binding
 // (the pins, the bus masters and slaves it declares) and before the first Step, so the nodes and scripts it declares are there before cycle 0;
 // it declares them (tb.Declare, Sim.Script) and returns what the cases need. Every case gets the result.
 type PpuBenchEnvTests[E any] interface {
 	Env(u *PpuBench) *E
+	// bench/bw_10: 10 overlapping 64x64 8bpp sprites over the background
+	Bw10(u *PpuBench, e *E)
+	// bench/bw_2: 2 overlapping 64x64 8bpp sprites over the background
+	Bw2(u *PpuBench, e *E)
+	// bench/bw_4: 4 overlapping 64x64 8bpp sprites over the background
+	Bw4(u *PpuBench, e *E)
+	// bench/bw_6: 6 overlapping 64x64 8bpp sprites over the background
+	Bw6(u *PpuBench, e *E)
+	// bench/bw_8: 8 overlapping 64x64 8bpp sprites over the background
+	Bw8(u *PpuBench, e *E)
+	// bench/depth_12: 12 deep: 11 stacked 32x32 4bpp sprites over the background
+	Depth12(u *PpuBench, e *E)
+	// bench/depth_16: 16 deep: 15 stacked 32x32 4bpp sprites over the background
+	Depth16(u *PpuBench, e *E)
+	// bench/depth_20: 20 deep: 19 stacked 32x32 4bpp sprites over the background
+	Depth20(u *PpuBench, e *E)
+	// bench/depth_24: 24 deep: 23 stacked 32x32 4bpp sprites over the background
+	Depth24(u *PpuBench, e *E)
+	// bench/depth_4: 4 deep: 3 stacked 32x32 4bpp sprites over the background
+	Depth4(u *PpuBench, e *E)
+	// bench/depth_8: 8 deep: 7 stacked 32x32 4bpp sprites over the background
+	Depth8(u *PpuBench, e *E)
 	// frame/empty_black: no sprite, black backdrop: the control case, right even with no renderer
 	EmptyBlack(u *PpuBench, e *E)
 	// frame/sprites_basic: a scaled giant background, overlapping 4bpp and 8bpp sprites, flips, off-screen edges and hitboxes
@@ -115,48 +137,10 @@ type PpuBenchEnvTests[E any] interface {
 	Stack16(u *PpuBench, e *E)
 	// stress/stack_7: 7 sprites on the same pixels over the background: 8 deep
 	Stack7(u *PpuBench, e *E)
-	// sweep/bw_10: 10 overlapping 64x64 8bpp sprites over the background
-	Bw10(u *PpuBench, e *E)
-	// sweep/bw_2: 2 overlapping 64x64 8bpp sprites over the background
-	Bw2(u *PpuBench, e *E)
-	// sweep/bw_4: 4 overlapping 64x64 8bpp sprites over the background
-	Bw4(u *PpuBench, e *E)
-	// sweep/bw_6: 6 overlapping 64x64 8bpp sprites over the background
-	Bw6(u *PpuBench, e *E)
-	// sweep/bw_8: 8 overlapping 64x64 8bpp sprites over the background
-	Bw8(u *PpuBench, e *E)
-	// sweep/depth_12: 12 deep: 11 stacked 32x32 4bpp sprites over the background
-	Depth12(u *PpuBench, e *E)
-	// sweep/depth_16: 16 deep: 15 stacked 32x32 4bpp sprites over the background
-	Depth16(u *PpuBench, e *E)
-	// sweep/depth_20: 20 deep: 19 stacked 32x32 4bpp sprites over the background
-	Depth20(u *PpuBench, e *E)
-	// sweep/depth_24: 24 deep: 23 stacked 32x32 4bpp sprites over the background
-	Depth24(u *PpuBench, e *E)
-	// sweep/depth_4: 4 deep: 3 stacked 32x32 4bpp sprites over the background
-	Depth4(u *PpuBench, e *E)
-	// sweep/depth_8: 8 deep: 7 stacked 32x32 4bpp sprites over the background
-	Depth8(u *PpuBench, e *E)
 }
 
 // PpuBenchEnvDefaults is PpuBenchDefaults for a module with an Env: embed PpuBenchEnvDefaults[Env].
 type PpuBenchEnvDefaults[E any] struct{}
-
-func (PpuBenchEnvDefaults[E]) EmptyBlack(u *PpuBench, _ *E) { u.Sim.NotWritten() }
-
-func (PpuBenchEnvDefaults[E]) SpritesBasic(u *PpuBench, _ *E) { u.Sim.NotWritten() }
-
-func (PpuBenchEnvDefaults[E]) Bandwidth8bpp(u *PpuBench, _ *E) { u.Sim.NotWritten() }
-
-func (PpuBenchEnvDefaults[E]) BusyScreen(u *PpuBench, _ *E) { u.Sim.NotWritten() }
-
-func (PpuBenchEnvDefaults[E]) LineStorm(u *PpuBench, _ *E) { u.Sim.NotWritten() }
-
-func (PpuBenchEnvDefaults[E]) Sparse(u *PpuBench, _ *E) { u.Sim.NotWritten() }
-
-func (PpuBenchEnvDefaults[E]) Stack16(u *PpuBench, _ *E) { u.Sim.NotWritten() }
-
-func (PpuBenchEnvDefaults[E]) Stack7(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
 func (PpuBenchEnvDefaults[E]) Bw10(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
@@ -180,12 +164,83 @@ func (PpuBenchEnvDefaults[E]) Depth4(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
 func (PpuBenchEnvDefaults[E]) Depth8(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
+func (PpuBenchEnvDefaults[E]) EmptyBlack(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) SpritesBasic(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Bandwidth8bpp(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) BusyScreen(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) LineStorm(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Sparse(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Stack16(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
+func (PpuBenchEnvDefaults[E]) Stack7(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
 // Methods are the Go names of the declared tests, for run.Orphans.
-var Methods = []string{"EmptyBlack", "SpritesBasic", "Bandwidth8bpp", "BusyScreen", "LineStorm", "Sparse", "Stack16", "Stack7", "Bw10", "Bw2", "Bw4", "Bw6", "Bw8", "Depth12", "Depth16", "Depth20", "Depth24", "Depth4", "Depth8"}
+var Methods = []string{"Bw10", "Bw2", "Bw4", "Bw6", "Bw8", "Depth12", "Depth16", "Depth20", "Depth24", "Depth4", "Depth8", "EmptyBlack", "SpritesBasic", "Bandwidth8bpp", "BusyScreen", "LineStorm", "Sparse", "Stack16", "Stack7"}
 
 // Cases are the declared tests, each on a fresh model, reset first.
 func Cases(t PpuBenchTests) []run.Case {
 	return []run.Case{
+		{Name: "bw_10", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Bw10(u)
+		}},
+		{Name: "bw_2", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Bw2(u)
+		}},
+		{Name: "bw_4", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Bw4(u)
+		}},
+		{Name: "bw_6", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Bw6(u)
+		}},
+		{Name: "bw_8", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Bw8(u)
+		}},
+		{Name: "depth_12", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Depth12(u)
+		}},
+		{Name: "depth_16", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Depth16(u)
+		}},
+		{Name: "depth_20", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Depth20(u)
+		}},
+		{Name: "depth_24", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Depth24(u)
+		}},
+		{Name: "depth_4", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Depth4(u)
+		}},
+		{Name: "depth_8", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Depth8(u)
+		}},
 		{Name: "empty_black", Category: "frame", Body: func(s *tb.Sim) {
 			u := Bind(s)
 			u.Reset()
@@ -226,67 +281,78 @@ func Cases(t PpuBenchTests) []run.Case {
 			u.Reset()
 			t.Stack7(u)
 		}},
-		{Name: "bw_10", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Bw10(u)
-		}},
-		{Name: "bw_2", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Bw2(u)
-		}},
-		{Name: "bw_4", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Bw4(u)
-		}},
-		{Name: "bw_6", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Bw6(u)
-		}},
-		{Name: "bw_8", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Bw8(u)
-		}},
-		{Name: "depth_12", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Depth12(u)
-		}},
-		{Name: "depth_16", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Depth16(u)
-		}},
-		{Name: "depth_20", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Depth20(u)
-		}},
-		{Name: "depth_24", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Depth24(u)
-		}},
-		{Name: "depth_4", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Depth4(u)
-		}},
-		{Name: "depth_8", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			u.Reset()
-			t.Depth8(u)
-		}},
 	}
 }
 
 // EnvCases are Cases for a module with an Env: each case binds a fresh model, calls Env, resets and calls the test with what Env made.
 func EnvCases[E any](t PpuBenchEnvTests[E]) []run.Case {
 	return []run.Case{
+		{Name: "bw_10", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Bw10(u, e)
+		}},
+		{Name: "bw_2", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Bw2(u, e)
+		}},
+		{Name: "bw_4", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Bw4(u, e)
+		}},
+		{Name: "bw_6", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Bw6(u, e)
+		}},
+		{Name: "bw_8", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Bw8(u, e)
+		}},
+		{Name: "depth_12", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Depth12(u, e)
+		}},
+		{Name: "depth_16", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Depth16(u, e)
+		}},
+		{Name: "depth_20", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Depth20(u, e)
+		}},
+		{Name: "depth_24", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Depth24(u, e)
+		}},
+		{Name: "depth_4", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Depth4(u, e)
+		}},
+		{Name: "depth_8", Category: "bench", Bench: true, Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Depth8(u, e)
+		}},
 		{Name: "empty_black", Category: "frame", Body: func(s *tb.Sim) {
 			u := Bind(s)
 			e := t.Env(u)
@@ -334,72 +400,6 @@ func EnvCases[E any](t PpuBenchEnvTests[E]) []run.Case {
 			e := t.Env(u)
 			u.Reset()
 			t.Stack7(u, e)
-		}},
-		{Name: "bw_10", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Bw10(u, e)
-		}},
-		{Name: "bw_2", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Bw2(u, e)
-		}},
-		{Name: "bw_4", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Bw4(u, e)
-		}},
-		{Name: "bw_6", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Bw6(u, e)
-		}},
-		{Name: "bw_8", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Bw8(u, e)
-		}},
-		{Name: "depth_12", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Depth12(u, e)
-		}},
-		{Name: "depth_16", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Depth16(u, e)
-		}},
-		{Name: "depth_20", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Depth20(u, e)
-		}},
-		{Name: "depth_24", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Depth24(u, e)
-		}},
-		{Name: "depth_4", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Depth4(u, e)
-		}},
-		{Name: "depth_8", Category: "sweep", Body: func(s *tb.Sim) {
-			u := Bind(s)
-			e := t.Env(u)
-			u.Reset()
-			t.Depth8(u, e)
 		}},
 	}
 }
