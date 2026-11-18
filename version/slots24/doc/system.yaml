@@ -1,0 +1,86 @@
+# ppu_bench: the chip, its clock and reset, the modules in it and the bus that joins them.
+# `hw-proj validate` checks this file and the module specs beside it; `hw-proj gen all` writes the rest from them.
+chip: ppu_bench
+
+# clocks: where each clock comes from. A source is a pin of the chip, here named "clk"; the frame (the board) says what drives it.
+clocks:
+  sources:
+    clk_pin: {type: pin, pin: clk, freq_mhz: 100}     # the name on the left is the source; pin: is the chip's pin
+  domains:
+    clk: {source: clk_pin}                          # one clock domain, called clk
+
+# reset: power-on reset. self_reset: the reset controller synchronises it itself. release: the groups it lets go.
+reset:
+  source:
+    por_n: {pin: porb, active_low: true, self_reset: true, release: [system]}
+  group:
+    system: {target: [core0, sram0, oam0, lst0, ppu0, racer0, texld0, tex0, gpio0, xbar]}     # what this reset holds in reset
+
+# instances: the modules in the chip. module: names a spec in doc/<module>.yaml (or a module hw-proj generates).
+instances:
+  core0: {module: hazard3_cpu_2port, params: {EXTENSION_A: 0}}     # the bus master: a Hazard3 RISC-V core (vendor code, the submodule); its isa (rv32imc_zicsr) is derived from its parameters; A is off: the bus has no exclusive monitor
+  sram0: {module: sram_bank, params: {DEPTH: 16384}}     # 16384 words of 4 bytes = 64kb; the program is baked in here, at address 0
+  gpio0: {module: gpio}                                # generated from pinout.yaml
+  oam0: {module: buf_bank, params: {DEPTH: 256}}       # the sprite table: 128 sprites of 8 bytes = 1kb (spec/sprite-spec.md section 2)
+  lst0: {module: buf_bank, params: {DEPTH: 1024}}      # the per-line sprite lists the render unit writes back: two lists (line y on show, line y+1 being built), 4kb
+  ppu0: {module: ppu, params: {SLOTS: 24}}                                  # the render unit: races the beam, streams each pixel into racer0
+  racer0: {module: racer}                              # the VGA output unit: the stream VGA block (doc/vga.yaml), no buffer; colour bars until ppu0 starts
+  texld0: {module: texld, params: {TEX_W: 32}}                              # the texture loader: the core's window into bus tex, refused once the render unit runs
+  tex0: {module: tex_bank, params: {DEPTH: 16384, WIDTH: 32}}   # the texture SRAM: palette at 0..511, then textures; 64kb, static once the engine starts; words as wide as bus tex
+  rcc0: {module: reset_clock_controller}               # generated: makes the chip's clock and reset from the sources above
+  xbar: {module: crossbar_central}                       # generated: joins the master to the slaves
+
+# buses: who talks to whom. The master reads and writes the slaves; each slave has a window: base address and size.
+# The core has two bus ports, one for instructions and one for data; mode: basic lets the first listed win when both ask.
+buses:
+  main:
+    clock: clk
+    protocol: ahb-lite
+    mode: basic
+    masters: [ppu0.oam, core0.data, core0.instruction]     # the render unit first: it races the beam
+    slaves:
+      - {instance: sram0, base: 0x00000000, size: 64kb}
+      - {instance: oam0, base: 0x20000000, size: 1kb}
+      - {instance: lst0, base: 0x20010000, size: 4kb}
+      - {instance: ppu0.cfg, base: 0x30000000, size: 4kb}
+      - {instance: texld0.cfg, base: 0x31000000, size: 64kb}   # mirrors bus tex one to one
+      - {instance: gpio0, base: 0x40000000, size: 4kb}
+  # tex: the render unit's private bus to the static textures. data_width is the knob of the benchmark versions (32 here, 64/128 in versions).
+  tex:
+    clock: clk
+    protocol: ahb-lite
+    mode: basic
+    data_width: 32
+    masters: [ppu0.tex, texld0.tex]
+    slaves:
+      - {instance: tex0, base: 0x00000000, size: 64kb}
+
+connections:
+  vga_stream:     # racer0 names the pixel it needs (lead pixels ahead of the beam), ppu0 answers with its colour
+    - {from: racer0.x, to: ppu0.x}
+    - {from: racer0.y, to: ppu0.y}
+    - {from: racer0.active, to: ppu0.active}
+    - {from: racer0.vblank, to: ppu0.vblank}
+    - {from: racer0.frame_start, to: ppu0.frame_start}
+    - {from: racer0.pix_stb, to: ppu0.pix_stb}
+    - {from: ppu0.pixel, to: racer0.pixel}
+    - {from: ppu0.engine_on, to: racer0.use_ppu}
+  texture_lock:
+    - {from: ppu0.engine_on, to: texld0.lock, desc: "textures are read-only once the render unit has started"}
+
+# tests: one frame per reset (spec/sprite-spec.md section 8). Each case loads bench/build/<workload>/app.elf into sram0, resets,
+# captures the frame from the VGA pins and compares it pixel by pixel with the golden model's (model/ppu_model.py). Build the
+# workloads first: make -C bench
+tests:
+  frame:
+    empty_black:   {desc: "no sprite, black backdrop: the control case, right even with no renderer"}
+    sprites_basic: {desc: "a scaled giant background, overlapping 4bpp and 8bpp sprites, flips, off-screen edges and hitboxes"}
+  # stress: each pushes one limit (model/workloads.py). A FAIL here is a result of the benchmark (a deadline the configuration
+  # misses: LATE > 0), not a broken test; the log line gives the load the workload asks for.
+  stress:
+    sparse:         {desc: "4 small sprites on the backdrop: the light case"}
+    line_storm:     {desc: "80 sprites side by side on the same lines (81 on a line, 2 deep)"}
+    stack_7:        {desc: "7 sprites on the same pixels over the background: 8 deep"}
+    stack_16:       {desc: "16 sprites on the same pixels over the background: 17 deep"}
+    bandwidth_8bpp: {desc: "6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels per sprite"}
+    busy_screen:    {desc: "all 128 sprites: background and 127 random ones"}

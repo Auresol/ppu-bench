@@ -198,6 +198,15 @@ localparam [1:0]  HT_IDLE = 2'b00, HT_NONSEQ = 2'b10;
 localparam [2:0]  HSIZE_WORD = 3'b010;
 localparam int    NBINS = 40;                  // 640 / 16
 
+// bus tex is TW bits wide: its data_width in system.yaml, which hw-proj writes into this module's port list (a version with
+// another width gets this same body under its own port list). A slot's texture words are TW-bit words of tex0, numbered from
+// byte 0 (word k = bytes k*TB .. k*TB+TB-1); a texel is a bit offset in them, so a row need not start on a word boundary.
+localparam int    TW  = $bits(b_hrdata);
+localparam int    TB  = TW / 8;                  // bytes a word
+localparam int    LTW = $clog2(TW);              // bit offset -> word number: >> LTW
+localparam int    KW  = 16;                      // word numbers (signed: a prefetch pointer may step to -1)
+localparam [2:0]  HSIZE_TEX = 3'($clog2(TB));    // a whole bus tex word
+
 // ---------------------------------------------------------------------------------------------------------------------------
 // Raster: (cx, cy) is the lead side, the pixel racer0 names (x, y while active). Synced at frame_start and at the start of
 // the vertical blanking, stepped at every pix_stb like racer0's own counter.
@@ -313,37 +322,41 @@ logic [3:0]          spal  [A];
 logic                sb8   [A], shb [A], shf [A], ssh [A];   // 8bpp, hitbox, hflip, scale 2
 logic signed [12:0]  sx    [A], sxe [A];                     // screen columns [sx, sxe)
 logic [9:0]          sW    [A];                              // texture width
-logic [17:0]         srow  [A];                              // word address of its row in tex0
-logic [7:0]          snw   [A];                              // words in the row
-logic signed [8:0]   skc   [A], skf [A];                     // word the beam is at, next word to fetch
-logic [31:0]         sbuf  [A][2];                           // two words, by the word number's low bit
-logic [7:0]          stag  [A][2];
+logic [17:0]         srb   [A];                              // byte address of its row in tex0
+logic signed [KW-1:0] skfirst [A], sklast [A];               // the words its row spans
+logic signed [KW-1:0] skc   [A], skf [A];                    // word the beam is at, next word to fetch
+logic [TW-1:0]       sbuf  [A][2];                           // two words, by the word number's low bit
+logic [KW-1:0]       stag  [A][2];
 logic                sbv   [A][2];
 logic                spend [A];                              // a fetch is on bus tex
 
 // ---- S0: every slot's texel at (cx, cy), combinational ----
 logic                c_cov [A], c_opq [A], c_late [A];
 logic [7:0]          c_c   [A];
-logic signed [8:0]   c_k   [A];
+logic signed [KW-1:0] c_k  [A];
 logic                c_free[A];      // passed by the beam: may be reused
 
 always_comb begin
     for (int s = 0; s < A; s++) begin
         logic signed [12:0] cxs, dx;
         logic [9:0]  u0, u;
-        logic [7:0]  k;
+        logic [21:0] bit_at;      // the texel's bit address in tex0
+        logic [KW-1:0] k;
+        logic [LTW-1:0] boff;
         logic        e;
-        logic [31:0] w;
+        logic [TW-1:0] w;
         cxs = $signed({3'b000, cx});
         dx  = cxs - sx[s];
         u0  = ssh[s] ? dx[10:1] : dx[9:0];
         u   = shf[s] ? (sW[s] - 10'd1 - u0) : u0;
-        k   = sb8[s] ? u[9:2] : {1'b0, u[9:3]};
-        e   = k[0];
-        w   = sbuf[s][e];
-        c_k[s]   = $signed({1'b0, k});
+        bit_at = {1'b0, srb[s], 3'b000} + (sb8[s] ? {9'd0, u, 3'b000} : {10'd0, u, 2'b00});
+        k    = KW'(bit_at >> LTW);
+        boff = bit_at[LTW-1:0];
+        e    = k[0];
+        w    = sbuf[s][e];
+        c_k[s]   = $signed(k);
         c_cov[s] = sv[s] && frame_px && (sline[s] == cy[8:0]) && (dx >= 0) && (cxs < sxe[s]);
-        c_c[s]   = sb8[s] ? w[8*u[1:0] +: 8] : {4'h0, w[4*u[2:0] +: 4]};
+        c_c[s]   = sb8[s] ? w[boff +: 8] : {4'h0, w[boff +: 4]};
         c_late[s] = c_cov[s] && !(sbv[s][e] && stag[s][e] == k);
         c_opq[s]  = c_cov[s] && !c_late[s] && (c_c[s] != 8'h0);
         // free once its line is over, or the beam is past its right edge (or the visible picture) on its line
@@ -399,7 +412,7 @@ assign ev_addr = (evs == EV_WR) ? LST_BASE + {22'd0, E[0], ev_n, 2'b00} : OAM_BA
 assign ev_wd   = {17'd0, hv[E[0]][ev_bin], hp[E[0]][ev_bin], ev_i};   // push front: the entry links to the bin's old head
 
 // ---- admission ----
-typedef enum logic [3:0] {AD_IDLE, AD_WAIT, AD_BIN, AD_RDL, AD_RD0, AD_RD1, AD_C1, AD_C2, AD_LOAD, AD_END} adst_t;
+typedef enum logic [3:0] {AD_IDLE, AD_WAIT, AD_BIN, AD_RDL, AD_RD0, AD_RD1, AD_C1, AD_C2, AD_C3, AD_LOAD, AD_END} adst_t;
 adst_t             ads;
 logic [8:0]        L;                // the line being admitted
 logic [5:0]        ad_b;             // bin being admitted (the frontier)
@@ -421,9 +434,9 @@ logic        a_sh, a_hf, a_vf, a_b8, a_hb;
 logic [1:0]  a_prio;
 logic [3:0]  a_pal;
 logic [13:0] a_tex;
-logic [17:0] a_row;
-logic [7:0]  a_nw;
-logic signed [8:0] a_k0;
+logic [17:0] a_rb;                 // byte address of the row
+logic [9:0]  a_uf;                 // the texel of the first pixel on screen
+logic signed [KW-1:0] a_k0, a_kfirst, a_klast;
 
 // the first free slot
 logic          have_free;
@@ -474,7 +487,8 @@ always_ff @(posedge clk or negedge rst_n) begin
         ads <= AD_IDLE; L <= '0; ad_b <= '0; ad_p <= '0; ad_idx <= '0; ad_nx <= '0; ad_nv <= 1'b0;
         adm_done_line <= -11'sd1; ad_w0 <= '0; ad_w1 <= '0;
         a_x <= '0; a_xe <= '0; a_W <= '0; a_H <= '0; a_v0 <= '0; a_v <= '0; a_sh <= 1'b0; a_hf <= 1'b0; a_vf <= 1'b0;
-        a_b8 <= 1'b0; a_hb <= 1'b0; a_prio <= '0; a_pal <= '0; a_tex <= '0; a_row <= '0; a_nw <= '0; a_k0 <= '0;
+        a_b8 <= 1'b0; a_hb <= 1'b0; a_prio <= '0; a_pal <= '0; a_tex <= '0; a_rb <= '0; a_uf <= '0;
+        a_k0 <= '0; a_kfirst <= '0; a_klast <= '0;
     end else begin
         case (ads)
             AD_IDLE: if (est == E_PREP) begin L <= '0; ads <= AD_WAIT; end
@@ -511,7 +525,7 @@ always_ff @(posedge clk or negedge rst_n) begin
             end
             AD_C2: begin
                 /* verilator lint_off UNUSEDSIGNAL */
-                logic [9:0]  v, u0, uf;           // uf[1:0]: below the word
+                logic [9:0]  v, u0, uf;
                 logic [19:0] vw;
                 logic signed [12:0] cx0, du;      // du: 0..2*W, the top bits are 0
                 /* verilator lint_on UNUSEDSIGNAL */
@@ -521,10 +535,20 @@ always_ff @(posedge clk or negedge rst_n) begin
                 du  = cx0 - a_x;
                 u0  = a_sh ? du[10:1] : du[9:0];
                 uf  = a_hf ? (a_W - 10'd1 - u0) : u0;
-                a_v   <= v;
-                a_row <= {1'b0, a_tex, 3'b000} + (a_b8 ? 18'(vw >> 2) : 18'(vw >> 3));
-                a_nw  <= a_b8 ? a_W[9:2] : {1'b0, a_W[9:3]};
-                a_k0  <= a_b8 ? $signed({1'b0, uf[9:2]}) : $signed({2'b00, uf[9:3]});
+                a_v  <= v;
+                a_rb <= {a_tex[12:0], 5'b00000} + (a_b8 ? 18'(vw) : 18'(vw >> 1));   // tex in 32-byte units, then v rows
+                a_uf <= uf;
+                ads <= AD_C3;
+            end
+            AD_C3: begin
+                // in bits: the row starts at rb*8 and is W*bpp long; the first texel on screen is at rb*8 + uf*bpp
+                logic [21:0] row_bit, first_bit, last_bit;
+                row_bit   = {1'b0, a_rb, 3'b000};
+                first_bit = row_bit + (a_b8 ? {9'd0, a_uf, 3'b000} : {10'd0, a_uf, 2'b00});
+                last_bit  = row_bit + (a_b8 ? {9'd0, a_W, 3'b000} : {10'd0, a_W, 2'b00}) - 22'd1;
+                a_k0     <= $signed(KW'(first_bit >> LTW));
+                a_kfirst <= $signed(KW'(row_bit >> LTW));
+                a_klast  <= $signed(KW'(last_bit >> LTW));
                 ads <= AD_LOAD;
             end
             AD_LOAD: if (have_free) begin    // the slot block loads it this cycle (adm_load)
@@ -550,8 +574,9 @@ logic [1:0]    bph;
 logic          b_pal;            // the access in flight loads the palette
 logic [AW-1:0] b_slot;
 logic          b_e;
-logic [7:0]    b_k;
+logic [KW-1:0] b_k;
 logic [31:0]   b_addr_r;
+logic [2:0]    b_size_r;
 
 logic          b_want [A];
 logic          any_want;
@@ -559,9 +584,9 @@ logic [AW-1:0] want_s;
 always_comb begin
     any_want = 1'b0; want_s = '0;
     for (int s = A - 1; s >= 0; s--) begin
-        logic signed [8:0] ahead;
+        logic signed [KW-1:0] ahead;
         ahead = shf[s] ? (skc[s] - skf[s]) : (skf[s] - skc[s]);
-        b_want[s] = sv[s] && !spend[s] && !c_free[s] && (skf[s] >= 0) && (skf[s] < $signed({1'b0, snw[s]})) && (ahead <= 9'sd1);
+        b_want[s] = sv[s] && !spend[s] && !c_free[s] && (skf[s] >= skfirst[s]) && (skf[s] <= sklast[s]) && (ahead <= 1);
         if (b_want[s]) begin any_want = 1'b1; want_s = AW'(s); end
     end
 end
@@ -572,15 +597,17 @@ wire b_fill       = (bph == 2'd2) && b_hready && !b_pal;
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        bph <= '0; b_pal <= 1'b0; b_slot <= '0; b_e <= 1'b0; b_k <= '0; b_addr_r <= '0; pal_w <= '0;
+        bph <= '0; b_pal <= 1'b0; b_slot <= '0; b_e <= 1'b0; b_k <= '0; b_addr_r <= '0; b_size_r <= HSIZE_WORD; pal_w <= '0;
     end else begin
         case (bph)
             2'd0: if (b_issue_pal) begin
-                      bph <= 2'd1; b_pal <= 1'b1; b_addr_r <= {23'd0, pal_w[6:0], 2'b00};
+                      // the palette in 32-bit reads whatever the bus width: 128 of them, two entries each
+                      bph <= 2'd1; b_pal <= 1'b1; b_addr_r <= {23'd0, pal_w[6:0], 2'b00}; b_size_r <= HSIZE_WORD;
                   end else if (b_issue_slot) begin
                       bph <= 2'd1; b_pal <= 1'b0; b_slot <= want_s;
-                      b_k <= skf[want_s][7:0]; b_e <= skf[want_s][0];
-                      b_addr_r <= {12'd0, srow[want_s] + 18'(skf[want_s][7:0]), 2'b00};
+                      b_k <= skf[want_s]; b_e <= skf[want_s][0];
+                      b_addr_r <= 32'(skf[want_s]) << $clog2(TB);   // a whole word
+                      b_size_r <= HSIZE_TEX;
                   end
             2'd1: if (b_hready) bph <= 2'd2;
             2'd2: if (b_hready) begin
@@ -593,17 +620,19 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 // the palette: two 16-bit entries per word, rgb444 in bits [11:0] of each
+localparam int PLANES = TW / 32;                       // 32-bit lanes of a bus tex word
+wire [31:0] pal_word = b_hrdata[32 * ((PLANES > 1) ? int'(pal_w) % PLANES : 0) +: 32];   // the lane the read addressed
 always_ff @(posedge clk)
     if (bph == 2'd2 && b_hready && b_pal) begin
-        pal_mem[{pal_w[6:0], 1'b0}] <= b_hrdata[11:0];
-        pal_mem[{pal_w[6:0], 1'b1}] <= b_hrdata[27:16];
+        pal_mem[{pal_w[6:0], 1'b0}] <= pal_word[11:0];
+        pal_mem[{pal_w[6:0], 1'b1}] <= pal_word[27:16];
     end
 
 assign b_htrans = (bph == 2'd1) ? HT_NONSEQ : HT_IDLE;   // idle before START: texld0 owns bus tex until then
 assign b_haddr  = b_addr_r;
 assign b_hwrite = 1'b0;
-assign b_hsize  = HSIZE_WORD;
-assign b_hwdata = 32'h0;
+assign b_hsize  = b_size_r;
+assign b_hwdata = '0;
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Slot state: load (admission), fetch issue and fill (bus tex), the beam (S0), free
@@ -613,7 +642,7 @@ always_ff @(posedge clk or negedge rst_n) begin
         for (int s = 0; s < A; s++) begin
             sv[s] <= 1'b0; sline[s] <= '0; sidx[s] <= '0; sprio[s] <= '0; spal[s] <= '0;
             sb8[s] <= 1'b0; shb[s] <= 1'b0; shf[s] <= 1'b0; ssh[s] <= 1'b0;
-            sx[s] <= '0; sxe[s] <= '0; sW[s] <= '0; srow[s] <= '0; snw[s] <= '0; skc[s] <= '0; skf[s] <= '0;
+            sx[s] <= '0; sxe[s] <= '0; sW[s] <= '0; srb[s] <= '0; skfirst[s] <= '0; sklast[s] <= '0; skc[s] <= '0; skf[s] <= '0;
             spend[s] <= 1'b0;
             for (int e = 0; e < 2; e++) begin sbuf[s][e] <= '0; stag[s][e] <= '0; sbv[s][e] <= 1'b0; end
         end
@@ -626,14 +655,14 @@ always_ff @(posedge clk or negedge rst_n) begin
             sv[free_s] <= 1'b1;      sline[free_s] <= L;        sidx[free_s] <= ad_idx;
             sprio[free_s] <= a_prio; spal[free_s] <= a_pal;      sb8[free_s] <= a_b8;   shb[free_s] <= a_hb;
             shf[free_s] <= a_hf;     ssh[free_s] <= a_sh;        sx[free_s] <= a_x;     sxe[free_s] <= a_xe;
-            sW[free_s] <= a_W;       srow[free_s] <= a_row;      snw[free_s] <= a_nw;
+            sW[free_s] <= a_W;       srb[free_s] <= a_rb;        skfirst[free_s] <= a_kfirst; sklast[free_s] <= a_klast;
             skc[free_s] <= a_k0;     skf[free_s] <= a_k0;
             sbv[free_s][0] <= 1'b0;  sbv[free_s][1] <= 1'b0;
         end
         if (b_issue_slot) begin
             spend[want_s] <= 1'b1;
             sbv[want_s][skf[want_s][0]] <= 1'b0;
-            skf[want_s] <= shf[want_s] ? skf[want_s] - 9'sd1 : skf[want_s] + 9'sd1;
+            skf[want_s] <= shf[want_s] ? skf[want_s] - 1 : skf[want_s] + 1;
         end
         if (b_fill) begin
             spend[b_slot] <= 1'b0;
@@ -714,6 +743,8 @@ assign late_count = late_r;
 assign hit_bits   = hit_r;
 
 // racer0 names (x, y, active) too; this unit keeps its own count of the same raster (cx, cy)
-wire _unused_renderer = &{1'b0, x, y, active, a_hresp, b_hresp, a_v, ad_w1[31:21], ad_w0[28], ev_w0[31:29]};
+// a_tex[13]: textures past 256 kb, beyond any tex0; pal_word[31:28, 15:12]: the unused top bits of the 16-bit entries
+wire _unused_renderer = &{1'b0, x, y, active, a_hresp, b_hresp, a_v, ad_w1[31:21], ad_w0[28], ev_w0[31:29], a_tex[13],
+                         pal_word[31:28], pal_word[15:12]};
 
 endmodule

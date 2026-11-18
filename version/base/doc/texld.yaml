@@ -8,5 +8,7 @@ bus:
   interfaces:
     - {name: cfg, type: slave, prefix: s_}
     - {name: tex, type: master, prefix: m_}
+params:
+  - {name: TEX_W, default: 32}   # the data width of bus tex: set it with data_width in system.yaml
 ports:
   - {name: lock, dir: in, width: 1, default: 0}

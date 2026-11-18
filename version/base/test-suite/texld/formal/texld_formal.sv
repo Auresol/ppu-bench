@@ -27,7 +27,9 @@ module texld_formal (
     wire [31:0] m_hwdata;
 
     // The module under proof
-    texld dut (.*);
+    texld #(
+        .TEX_W(32)
+    ) dut (.*);
 
     // The properties
     texld_props props (.*);

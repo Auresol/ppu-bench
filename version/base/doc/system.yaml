@@ -25,8 +25,8 @@ instances:
   lst0: {module: buf_bank, params: {DEPTH: 1024}}      # the per-line sprite lists the render unit writes back: two lists (line y on show, line y+1 being built), 4kb
   ppu0: {module: ppu}                                  # the render unit: races the beam, streams each pixel into racer0
   racer0: {module: racer}                              # the VGA output unit: the stream VGA block (doc/vga.yaml), no buffer; colour bars until ppu0 starts
-  texld0: {module: texld}                              # the texture loader: the core's window into bus tex, refused once the render unit runs
-  tex0: {module: sram_bank, params: {DEPTH: 16384}}    # the texture SRAM: palette at 0..511, then textures; 64kb, static once the engine starts
+  texld0: {module: texld, params: {TEX_W: 32}}                              # the texture loader: the core's window into bus tex, refused once the render unit runs
+  tex0: {module: tex_bank, params: {DEPTH: 16384, WIDTH: 32}}   # the texture SRAM: palette at 0..511, then textures; 64kb, static once the engine starts; words as wide as bus tex
   rcc0: {module: reset_clock_controller}               # generated: makes the chip's clock and reset from the sources above
   xbar: {module: crossbar_central}                       # generated: joins the master to the slaves
 

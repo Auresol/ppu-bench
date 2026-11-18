@@ -26,6 +26,7 @@ version/base/rtl/core/hazard3/hdl/hazard3_regfile_1w2r.v
 version/base/rtl/core/hazard3/hdl/hazard3_triggers.v
 version/base/rtl/soc/gpio.sv
 version/base/rtl/soc/memory/sram_bank.sv
+version/base/rtl/soc/memory/tex_bank.sv
 version/base/rtl/soc/peripheral/buf_bank.sv
 version/base/rtl/soc/peripheral/ppu.sv
 version/base/rtl/soc/peripheral/texld.sv
@@ -38,3 +39,4 @@ version/base/rtl/soc/fabric/main_parts.sv
 version/base/rtl/soc/fabric/tex.sv
 version/base/rtl/soc/fabric/tex_parts.sv
 version/base/rtl/soc/memory/sram_bank_array.sv
+version/base/rtl/soc/memory/tex_bank_array.sv

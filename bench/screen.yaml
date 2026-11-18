@@ -1,0 +1,5 @@
+# hw-link bench (guide/host-link.md, Watch mode): the screen decoded from the VGA pins of racer0 in the sim, no board needed.
+#   hw-link screen                                                   the window; pick a program, or:
+#   hw-link screen --elf bench/build/sprites_basic/app.elf           a workload (make -C bench first)
+#   hw-link screen --headless --frames 3 --png out/ --elf ...         no window: the decoded picture as out/screen.png
+watch: racer0

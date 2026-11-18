@@ -10,10 +10,16 @@
 //   ST_DONE  s_hready high with the read data: the main access completes
 //   ST_ERR2  the second cycle of the error response (the first is ST_ADDR with lock high)
 // Wait states on bus main: 2 when bus tex answers at once (ST_ADDR, ST_DATA), as doc/texld.yaml says (wait: {max: 3}).
+//
+// Bus tex is TEX_W bits wide (its data_width: 32, 64 or 128). A 32-bit access from bus main is one TEX_W-bit access at the
+// same byte address and size: the write data is copied onto every 32-bit lane (the slave's byte strobes, from haddr and
+// hsize, take the right bytes), the read data is the 32-bit lane that haddr names.
 
 `default_nettype none
 
-module texld (
+module texld #(
+    parameter TEX_W = 32      // data width of bus tex (keep equal to its data_width in system.yaml)
+) (
     input  wire        clk,
     input  wire        rst_n,
 
@@ -32,8 +38,8 @@ module texld (
     output wire        m_hwrite,
     output wire [1:0]  m_htrans,
     output wire [2:0]  m_hsize,
-    output wire [31:0] m_hwdata,
-    input  wire [31:0] m_hrdata,
+    output wire [TEX_W-1:0] m_hwdata,
+    input  wire [TEX_W-1:0] m_hrdata,
     input  wire        m_hready,
     /* verilator lint_off UNUSEDSIGNAL */
     input  wire        m_hresp,   // bus tex maps the whole window: no error can come back
@@ -43,6 +49,8 @@ module texld (
 );
 
 localparam [1:0] HTRANS_IDLE = 2'b00, HTRANS_NONSEQ = 2'b10;
+localparam int   LANES32 = TEX_W / 32;                          // 32-bit lanes of a bus tex word
+localparam int   LSB     = (LANES32 > 1) ? $clog2(LANES32) : 1; // bits of the lane number
 localparam [2:0] ST_IDLE = 3'd0, ST_ADDR = 3'd1, ST_DATA = 3'd2, ST_DONE = 3'd3, ST_ERR2 = 3'd4;
 
 reg [2:0]  state;
@@ -53,6 +61,9 @@ reg [31:0] wdata_r;
 reg [31:0] rdata_r;
 
 wire ready_state = (state == ST_IDLE) || (state == ST_DONE) || (state == ST_ERR2);
+
+// the 32-bit lane of the access (address bits above the byte in a 32-bit word); 0 on a 32-bit bus
+wire [LSB-1:0] lane = (LANES32 > 1) ? LSB'(addr_r >> 2) : '0;
 wire take        = ready_state && s_htrans[1];
 
 always @(posedge clk or negedge rst_n) begin
@@ -80,7 +91,7 @@ always @(posedge clk or negedge rst_n) begin
             end
             ST_DATA: begin
                 if (m_hready) begin
-                    rdata_r <= m_hrdata;
+                    rdata_r <= m_hrdata[32 * lane +: 32];
                     state   <= ST_DONE;
                 end
             end
@@ -99,7 +110,7 @@ assign m_htrans = (state == ST_ADDR && !lock) ? HTRANS_NONSEQ : HTRANS_IDLE;
 assign m_haddr  = {16'h0, addr_r};
 assign m_hwrite = write_r;
 assign m_hsize  = size_r;
-assign m_hwdata = wdata_r;
+assign m_hwdata = {LANES32{wdata_r}};
 
 wire _unused = &{1'b0, s_haddr[31:16], s_htrans[0]};
 

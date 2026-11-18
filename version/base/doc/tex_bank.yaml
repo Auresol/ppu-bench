@@ -1,0 +1,13 @@
+# The texture SRAM (tex0 on bus tex): palette and textures, static once the render unit starts. Its words are as wide as the
+# bus (WIDTH = data_width of bus tex), so the bus-width versions change WIDTH and DEPTH together and keep 64 kb.
+# rtl/soc/memory/tex_bank.sv is the bus side (hw-proj's wide-bus example); gen writes tex_bank_array, the storage.
+# No INIT_FILE: the textures are loaded at run time through texld0, and vivado-job fills every memory with that parameter from
+# the firmware .bin by its bus window, which for tex0 (0x0 on bus tex) would be the program's bytes.
+kind: memory
+memory: sram
+wait: none
+description: Texture SRAM with a slave port as wide as bus tex (32, 64 or 128 bits)
+bus: {type: slave}
+params:
+  - {name: DEPTH, default: 16384}
+  - {name: WIDTH, default: 32}

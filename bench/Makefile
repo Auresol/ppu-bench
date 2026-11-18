@@ -1,6 +1,7 @@
 # The benchmark workloads: for each one, the golden frame (model/build.py) and the firmware that loads it (main.c).
 #   make -C bench                 every workload
 #   make -C bench WORKLOADS=x     one
+#   make -C bench board           the program for the bitstream: board/$(BOARD).bin (default sprites_basic)
 # Output: build/<workload>/{workload.h, expected.bin, expected.json, expected.png, app.elf}. The chip tests read them
 # (hw-proj test run ppu_bench); build them first.
 #
@@ -26,8 +27,15 @@ build/%/app.elf: build/%/workload.h main.c $(FW)/crt0.s $(FW)/bsp_runtime.c $(FW
 	$(CROSS)gcc $(CFLAGS) -Ibuild/$* $(LDFLAGS) $(FW)/crt0.s $(FW)/bsp_runtime.c main.c -o $@ -lgcc
 	@$(CROSS)size $@ | tail -1
 
+# The program baked into the bitstream (vivado-job's FIRMWARE_MEM must be a file git tracks): board/<BOARD>.bin
+BOARD ?= sprites_basic
+board: build/$(BOARD)/app.elf
+	@mkdir -p board
+	$(CROSS)objcopy -O binary $< board/$(BOARD).bin
+	@echo "board/$(BOARD).bin: $$(wc -c < board/$(BOARD).bin) bytes (FIRMWARE_MEM=bench/board/$(BOARD).bin vivado-job submit ...)"
+
 clean:
 	rm -rf build
 
-.PHONY: all clean
+.PHONY: all board clean
 .PRECIOUS: build/%/workload.h

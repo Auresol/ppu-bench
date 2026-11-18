@@ -130,7 +130,7 @@ module ppu_bench (
     wire        s_gpio0_hready;
     wire        s_gpio0_hresp;
 
-    // Bus: slave tex0 (sram_bank)
+    // Bus: slave tex0 (tex_bank)
     wire [31:0] s_tex0_haddr;
     wire        s_tex0_hwrite;
     wire [1:0]  s_tex0_htrans;
@@ -225,9 +225,6 @@ module ppu_bench (
 
     // sram0 (sram_bank): ports for you to wire
     wire sram0_hexokay;  // output of sram0: nothing in the zone uses it
-
-    // tex0 (sram_bank): ports for you to wire
-    wire tex0_hexokay;  // output of tex0: nothing in the zone uses it
 
     // The connections of system.yaml, group by group
     // vga_stream
@@ -367,9 +364,9 @@ module ppu_bench (
         .hresp(s_sram0_hresp),
         .hexokay(sram0_hexokay)
     );
-    sram_bank #(
+    tex_bank #(
         .DEPTH(16384),
-        .INIT_FILE(`ifdef FW_TEX0 `FW_TEX0 `else "" `endif)
+        .WIDTH(32)
     ) tex0 (
         .clk(clk_clk),
         .rst_n(rst_n_system),
@@ -380,8 +377,7 @@ module ppu_bench (
         .hwdata(s_tex0_hwdata),
         .hrdata(s_tex0_hrdata),
         .hready(s_tex0_hready),
-        .hresp(s_tex0_hresp),
-        .hexokay(tex0_hexokay)
+        .hresp(s_tex0_hresp)
     );
 
     // Peripherals
@@ -464,7 +460,7 @@ module ppu_bench (
         .pixel(ppu0_pixel),
         .engine_on(ppu0_engine_on)
     );
-    texld texld0 (
+    texld #(.TEX_W(32)) texld0 (
         .clk(clk_clk),
         .rst_n(rst_n_system),
         .s_haddr(s_texld0_haddr),

@@ -113,7 +113,7 @@ module crossbar_central (
     input  wire s_gpio0_hready,
     input  wire s_gpio0_hresp,
 
-    // slave tex0 (sram_bank) 0x0 + 0x10000
+    // slave tex0 (tex_bank) 0x0 + 0x10000
     output wire [31:0] s_tex0_haddr,
     output wire s_tex0_hwrite,
     output wire [1:0] s_tex0_htrans,

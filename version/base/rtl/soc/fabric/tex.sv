@@ -23,7 +23,7 @@ module tex (
     output wire m_texld0_tex_hready,
     output wire m_texld0_tex_hresp,
 
-    // slave tex0 (sram_bank) 0x0 + 0x10000
+    // slave tex0 (tex_bank) 0x0 + 0x10000
     output wire [31:0] s_tex0_haddr,
     output wire s_tex0_hwrite,
     output wire [1:0] s_tex0_htrans,
