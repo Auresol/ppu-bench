@@ -535,7 +535,12 @@ always_comb begin
     for (int s = A - 1; s >= 0; s--)
         if (!sv[s]) begin have_free = 1'b1; free_s = AW'(s); end
 end
-wire adm_load = (ads == AD_LOAD) && have_free;
+// a sprite the beam has already passed (its line is over, or the beam is right of its right edge on its line) can cover no
+// pixel any more: admission skips it instead of waiting for a slot. Without this, a pile of sprites on one spot held the
+// frontier back for the rest of the line, waiting for slots to load sprites behind the beam (pile_96).
+wire ad_passed = (est == E_RUN) && (($signed({2'b00, L}) < fl) ||
+                                     ($signed({2'b00, L}) == fl && $signed({3'b000, cx}) >= a_xe));
+wire adm_load  = (ads == AD_LOAD) && have_free && !ad_passed;
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -641,7 +646,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                 a_klast  <= $signed(KW'(last_bit >> LTW));
                 ads <= AD_LOAD;
             end
-            AD_LOAD: if (have_free) begin    // the slot block loads it this cycle (adm_load)
+            AD_LOAD: if (have_free || ad_passed) begin    // loaded this cycle (adm_load), or skipped: the beam is past it
                 if (ad_nv) begin ad_p <= ad_nx; ads <= AD_RDL; end
                 else begin ad_b <= ad_b + 6'd1; ads <= AD_BIN; end
             end
