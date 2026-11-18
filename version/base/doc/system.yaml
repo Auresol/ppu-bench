@@ -88,7 +88,7 @@ tests:
   # random: a whole scene drawn per seed (test-suite/ppu_bench/random.go): 16 to 127 sprites of every kind, anywhere on the
   # screen. A failing seed's report gives the replay: hw-proj test run ppu_bench --run 'random_scene#<i>'
   random:
-    random_scene:   {desc: "a random scene per seed: 16-127 sprites of every kind anywhere on the screen", seeds: 16}
+    random_scene:   {desc: "a random scene per seed: 16-127 sprites of every kind anywhere on the screen", seeds: 256}
   # bench: ladders of one knob each (test-suite/ppu_bench/workloads.go); a version's capacity is the last step it passes (rtl-stat-job metrics). The category bench
   # is hw-proj's for tests about cost (guide/testbench-bench.md): rtl-stat-job submit --bench runs them alone, with profiles.
   bench:

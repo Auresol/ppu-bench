@@ -319,7 +319,7 @@ func Cases(t PpuBenchTests) []run.Case {
 			u.Reset()
 			t.SpritesBasic(u)
 		}},
-		{Name: "random_scene", Category: "random", Seeds: 16, Body: func(s *tb.Sim) {
+		{Name: "random_scene", Category: "random", Seeds: 256, Body: func(s *tb.Sim) {
 			u := Bind(s)
 			u.Reset()
 			t.RandomScene(u)
@@ -467,7 +467,7 @@ func EnvCases[E any](t PpuBenchEnvTests[E]) []run.Case {
 			u.Reset()
 			t.SpritesBasic(u, e)
 		}},
-		{Name: "random_scene", Category: "random", Seeds: 16, Body: func(s *tb.Sim) {
+		{Name: "random_scene", Category: "random", Seeds: 256, Body: func(s *tb.Sim) {
 			u := Bind(s)
 			e := t.Env(u)
 			u.Reset()
