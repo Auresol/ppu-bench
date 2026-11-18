@@ -43,7 +43,7 @@ module main (
     input  wire s_sram0_hready,
     input  wire s_sram0_hresp,
 
-    // slave oam0 (buf_bank) 0x20000000 + 0x400
+    // slave oam0 (buf_bank) 0x20000000 + 0x800
     output wire [31:0] s_oam0_haddr,
     output wire s_oam0_hwrite,
     output wire [1:0] s_oam0_htrans,

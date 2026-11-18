@@ -1,7 +1,0 @@
-# Parked: rename back to screen.yaml once (1) hw-proj handoff chip-regions-reachable-ram.md is fixed (hw-link stops on the sram0/tex0
-# "overlap") and (2) the vivado-job on the job-manager host knows watch: (its validate refuses the key and so the whole submit).
-# hw-link bench (guide/host-link.md, Watch mode): the screen decoded from the VGA pins of racer0 in the sim, no board needed.
-#   hw-link screen                                                   the window; pick a program, or:
-#   hw-link screen --elf bench/build/sprites_basic/app.elf           a workload (make -C bench first)
-#   hw-link screen --headless --frames 3 --png out/ --elf ...         no window: the decoded picture as out/screen.png
-watch: racer0

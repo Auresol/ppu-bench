@@ -67,6 +67,8 @@ module ppu #(
 
     // Register field wires: read them in your logic, drive the ones marked
     wire         ctrl_start;           // CTRL.START [0:0] wf, strobe wen_ctrl
+    wire         ctrl_cont;            // CTRL.CONT [1:1] rw
+    wire         ctrl_oam_sel;         // CTRL.OAM_SEL [2:2] rw
     wire         status_done;          // STATUS.DONE [0:0] ro, drive it in your logic
     wire         status_busy;          // STATUS.BUSY [1:1] ro, drive it in your logic
     wire [31:0]  late_count;           // LATE.COUNT [31:0] ro, drive it in your logic
@@ -80,9 +82,12 @@ module ppu #(
     wire [31:0]  adm_wait_count;       // ADM_WAIT.COUNT [31:0] ro, drive it in your logic
     wire [31:0]  adm_slack_pixels;     // ADM_SLACK.PIXELS [31:0] ro, drive it in your logic
     wire [31:0]  tex_want_peak_count;  // TEX_WANT_PEAK.COUNT [31:0] ro, drive it in your logic
+    wire [31:0]  frame_count;          // FRAME.COUNT [31:0] ro, drive it in your logic
     wire [127:0] hit_bits;             // HIT%s.BITS [31:0] ro (dim=4 array), drive it in your logic
 
     // Field flops
+    reg        reg_ctrl_cont;
+    reg        reg_ctrl_oam_sel;
     reg  [9:0] reg_giant_w;
     reg  [9:0] reg_giant_h;
     reg        reg_giant_scale2;
@@ -120,10 +125,14 @@ module ppu #(
     // rw, rwh and wo fields: reset, hardware load, writes from the bus, alias effects
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
+            reg_ctrl_cont <= 1'b0;
+            reg_ctrl_oam_sel <= 1'b0;
             reg_giant_w <= 10'h000;
             reg_giant_h <= 10'h000;
             reg_giant_scale2 <= 1'b0;
         end else begin
+            if (wen_ctrl) reg_ctrl_cont <= bus_wdata[1:1];
+            if (wen_ctrl) reg_ctrl_oam_sel <= bus_wdata[2:2];
             if (wen_giant) reg_giant_w <= bus_wdata[9:0];
             if (wen_giant) reg_giant_h <= bus_wdata[19:10];
             if (wen_giant) reg_giant_scale2 <= bus_wdata[20:20];
@@ -131,6 +140,8 @@ module ppu #(
     end
 
     // Fields connected to their flops, the write data and the module ports
+    assign ctrl_cont = reg_ctrl_cont;
+    assign ctrl_oam_sel = reg_ctrl_oam_sel;
     assign giant_w = reg_giant_w;
     assign giant_h = reg_giant_h;
     assign giant_scale2 = reg_giant_scale2;
@@ -143,7 +154,8 @@ module ppu #(
         if (bus_rd) begin
             case (bus_addr)
                 12'h000: begin
-                    // no readable fields
+                    bus_rdata[1:1] = ctrl_cont;
+                    bus_rdata[2:2] = ctrl_oam_sel;
                 end
                 12'h004: begin
                     bus_rdata[0:0] = status_done;
@@ -177,6 +189,9 @@ module ppu #(
                 end
                 12'h058: begin
                     bus_rdata[31:0] = tex_want_peak_count;
+                end
+                12'h05C: begin
+                    bus_rdata[31:0] = frame_count;
                 end
                 12'h010: begin
                     bus_rdata[31:0] = hit_bits[31:0];
@@ -273,19 +288,35 @@ logic signed [10:0] fl;          // frame line on show (lead side): -1 in the bl
 logic [2:0]        fin_cnt;
 logic [7:0]        pal_w;        // palette words loaded (128 = all 256 entries)
 wire               pal_done = (pal_w == 8'd128);
+logic              oam_bank;     // the OAM bank this frame reads: CTRL.OAM_SEL latched as the frame starts to be prepared
+logic [31:0]       frames;       // frames finished (FRAME)
+logic              first_done;   // the first frame is finished (STATUS.DONE)
+logic              wrap_pend;    // a frame has ended: wait for the pipeline to empty, then latch HIT and count it
+logic [2:0]        wrap_cnt;
+// end of a frame's last line; in continuous mode (CTRL.CONT) the next frame is prepared from here on, in the same blanking
+wire               frame_end  = (est == E_RUN) && vb_rise;
+wire               frame_wrap = frame_end && ctrl_cont;
+wire               hit_latch  = wrap_pend && pix_stb && (wrap_cnt == 3'd4);
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         est <= E_IDLE; fl <= -11'sd1; fin_cnt <= '0;
+        oam_bank <= 1'b0; frames <= '0; first_done <= 1'b0; wrap_pend <= 1'b0; wrap_cnt <= '0;
     end else begin
+        if (frame_end) begin wrap_pend <= 1'b1; wrap_cnt <= '0; end
+        else if (wrap_pend && pix_stb) begin
+            wrap_cnt <= wrap_cnt + 3'd1;
+            if (hit_latch) begin wrap_pend <= 1'b0; frames <= frames + 32'd1; first_done <= 1'b1; end
+        end
         case (est)
             E_IDLE:   if (wen_ctrl && ctrl_start) est <= E_PAL;
             E_PAL:    if (pal_done) est <= E_WAITVB;
-            E_WAITVB: if (vb_rise) begin est <= E_PREP; fl <= -11'sd1; end
+            E_WAITVB: if (vb_rise) begin est <= E_PREP; fl <= -11'sd1; oam_bank <= ctrl_oam_sel; end
             E_PREP:   if (frame_start) begin est <= E_RUN; fl <= 11'sd0; end
             E_RUN: begin
                 if (pix_stb && cx == 10'd799) fl <= fl + 11'sd1;
-                if (vb_rise) begin est <= E_FIN; fin_cnt <= '0; end
+                if (frame_wrap) begin est <= E_PREP; fl <= -11'sd1; oam_bank <= ctrl_oam_sel; end
+                else if (vb_rise) begin est <= E_FIN; fin_cnt <= '0; end
             end
             E_FIN:    if (pix_stb) begin
                           fin_cnt <= fin_cnt + 3'd1;
@@ -297,8 +328,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 assign engine_on   = (est != E_IDLE);
-assign status_done = (est == E_DONE);
+assign status_done = first_done;   // the first frame is finished (in one-frame mode: the frame)
 assign status_busy = (est != E_IDLE) && (est != E_DONE);
+assign frame_count = frames;
 
 wire frame_px = (est == E_RUN) && (cy < 10'd480) && (cx < 10'd640);   // the pixel S0 works on is in the frame
 
@@ -437,7 +469,7 @@ wire ev_gate = (est == E_PREP || est == E_RUN) && ($signed({2'b00, E}) <= fl + 1
 
 assign ev_req  = (evs == EV_RD) || (evs == EV_WR);
 assign ev_we   = (evs == EV_WR);
-assign ev_addr = (evs == EV_WR) ? LST_BASE + {22'd0, E[0], ev_n, 2'b00} : OAM_BASE + {22'd0, ev_i, 3'b000};
+assign ev_addr = (evs == EV_WR) ? LST_BASE + {22'd0, E[0], ev_n, 2'b00} : OAM_BASE + {21'd0, oam_bank, ev_i, 3'b000};
 assign ev_wd   = {17'd0, hv[E[0]][ev_bin], hp[E[0]][ev_bin], ev_i};   // push front: the entry links to the bin's old head
 
 // ---- admission ----
@@ -454,7 +486,7 @@ wire               adm_active = (ads != AD_IDLE) && (ads != AD_WAIT);
 
 assign ad_req  = (ads == AD_RDL) || (ads == AD_RD0) || (ads == AD_RD1);
 assign ad_addr = (ads == AD_RDL) ? LST_BASE + {22'd0, L[0], ad_p, 2'b00}
-               : OAM_BASE + {22'd0, ad_idx, (ads == AD_RD1), 2'b00};
+               : OAM_BASE + {21'd0, oam_bank, ad_idx, (ads == AD_RD1), 2'b00};
 
 // decoded sprite (C1), then its row and first word (C2)
 logic signed [12:0] a_x, a_xe;
@@ -507,7 +539,8 @@ always_ff @(posedge clk or negedge rst_n) begin
             end
             default: evs <= EV_IDLE;
         endcase
-        if (est == E_FIN) evs <= EV_IDLE;
+        if (est == E_FIN || frame_wrap) evs <= EV_IDLE;     // a new frame starts from line 0
+        if (frame_wrap) ev_done_line <= -11'sd1;
     end
 end
 
@@ -591,7 +624,8 @@ always_ff @(posedge clk or negedge rst_n) begin
             end
             default: ads <= AD_IDLE;
         endcase
-        if (est == E_FIN) ads <= AD_IDLE;
+        if (est == E_FIN || frame_wrap) ads <= AD_IDLE;
+        if (frame_wrap) adm_done_line <= -11'sd1;
     end
 end
 
@@ -693,6 +727,9 @@ always_ff @(posedge clk or negedge rst_n) begin
             sbv[want_s][skf[want_s][0]] <= 1'b0;
             skf[want_s] <= shf[want_s] ? skf[want_s] - 1 : skf[want_s] + 1;
         end
+        // a new frame: every slot is free (a fetch still in flight lands in its buffer, tagged with its absolute word number,
+        // so whatever sprite takes the slot next sees correct data or a tag that does not match)
+        if (frame_wrap) for (int s = 0; s < A; s++) sv[s] <= 1'b0;
         if (b_fill) begin
             spend[b_slot] <= 1'b0;
             sbuf[b_slot][b_e] <= b_hrdata; stag[b_slot][b_e] <= b_k; sbv[b_slot][b_e] <= 1'b1;
@@ -717,7 +754,8 @@ logic        s0_b8  [A];
 logic        s1_v, s1_late;
 logic [7:0]  s1_pi;
 logic [31:0] late_r;
-logic [127:0] hit_r;
+logic [127:0] hit_r;          // hits of the frame being drawn
+logic [127:0] hit_q;          // of the last finished frame (HIT0..3)
 logic [11:0] pixel_r;
 
 // S1, combinational: the opaque slot with the smallest (prio, index) wins; hitboxes when two or more opaque ones meet
@@ -740,7 +778,7 @@ end
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         s0_v <= 1'b0; s0_late <= 1'b0; s1_v <= 1'b0; s1_late <= 1'b0; s1_pi <= '0;
-        late_r <= '0; hit_r <= '0; pixel_r <= '0;
+        late_r <= '0; hit_r <= '0; hit_q <= '0; pixel_r <= '0;
         for (int s = 0; s < A; s++) begin
             s0_opq[s] <= 1'b0; s0_hb[s] <= 1'b0; s0_c[s] <= '0; s0_idx[s] <= '0; s0_prio[s] <= '0; s0_pal[s] <= '0; s0_b8[s] <= 1'b0;
         end
@@ -759,6 +797,7 @@ always_ff @(posedge clk or negedge rst_n) begin
         s1_late <= s0_late;
         s1_pi   <= w_any ? w_pi : 8'h00;      // nothing opaque: the backdrop, palette[0]
         if (s0_v && s0_late && late_r != 32'hFFFF_FFFF) late_r <= late_r + 32'd1;
+        if (hit_latch) begin hit_q <= hit_r; hit_r <= '0; end   // no pixel of a frame is in S1 then: it is the blanking
         if (s0_v && hb_count >= 8'd2)
             for (int s = 0; s < A; s++)
                 if (s0_opq[s] && s0_hb[s]) hit_r[s0_idx[s]] <= 1'b1;
@@ -769,7 +808,7 @@ end
 
 assign pixel      = pixel_r;
 assign late_count = late_r;
-assign hit_bits   = hit_r;
+assign hit_bits   = hit_q;
 
 // racer0 names (x, y, active) too; this unit keeps its own count of the same raster (cx, cy)
 // ---------------------------------------------------------------------------------------------------------------------------

@@ -31,7 +31,7 @@ module main_ppu0_oam_decoder (
 
     // Name for the position of each entry
     localparam SRAM0 = 0;  // 0x0 + 0x10000
-    localparam OAM0 = 1;  // 0x20000000 + 0x400
+    localparam OAM0 = 1;  // 0x20000000 + 0x800
     localparam LST0 = 2;  // 0x20010000 + 0x1000
     localparam PPU0 = 3;  // 0x30000000 + 0x1000
     localparam TEXLD0 = 4;  // 0x31000000 + 0x10000
@@ -68,7 +68,7 @@ module main_ppu0_oam_decoder (
     // Address decode: which entry the address belongs to
     // hit: the address is in the window of the entry
     assign hit[SRAM0] = (a_haddr[31:16] == 16'h0000);
-    assign hit[OAM0] = (a_haddr[31:10] == 22'h080000);
+    assign hit[OAM0] = (a_haddr[31:11] == 21'h040000);
     assign hit[LST0] = (a_haddr[31:12] == 20'h20010);
     assign hit[PPU0] = (a_haddr[31:12] == 20'h30000);
     assign hit[TEXLD0] = (a_haddr[31:16] == 16'h3100);
@@ -169,7 +169,7 @@ module main_core0_data_decoder (
 
     // Name for the position of each entry
     localparam SRAM0 = 0;  // 0x0 + 0x10000
-    localparam OAM0 = 1;  // 0x20000000 + 0x400
+    localparam OAM0 = 1;  // 0x20000000 + 0x800
     localparam LST0 = 2;  // 0x20010000 + 0x1000
     localparam PPU0 = 3;  // 0x30000000 + 0x1000
     localparam TEXLD0 = 4;  // 0x31000000 + 0x10000
@@ -206,7 +206,7 @@ module main_core0_data_decoder (
     // Address decode: which entry the address belongs to
     // hit: the address is in the window of the entry
     assign hit[SRAM0] = (a_haddr[31:16] == 16'h0000);
-    assign hit[OAM0] = (a_haddr[31:10] == 22'h080000);
+    assign hit[OAM0] = (a_haddr[31:11] == 21'h040000);
     assign hit[LST0] = (a_haddr[31:12] == 20'h20010);
     assign hit[PPU0] = (a_haddr[31:12] == 20'h30000);
     assign hit[TEXLD0] = (a_haddr[31:16] == 16'h3100);
@@ -307,7 +307,7 @@ module main_core0_instruction_decoder (
 
     // Name for the position of each entry
     localparam SRAM0 = 0;  // 0x0 + 0x10000
-    localparam OAM0 = 1;  // 0x20000000 + 0x400
+    localparam OAM0 = 1;  // 0x20000000 + 0x800
     localparam LST0 = 2;  // 0x20010000 + 0x1000
     localparam PPU0 = 3;  // 0x30000000 + 0x1000
     localparam TEXLD0 = 4;  // 0x31000000 + 0x10000
@@ -344,7 +344,7 @@ module main_core0_instruction_decoder (
     // Address decode: which entry the address belongs to
     // hit: the address is in the window of the entry
     assign hit[SRAM0] = (a_haddr[31:16] == 16'h0000);
-    assign hit[OAM0] = (a_haddr[31:10] == 22'h080000);
+    assign hit[OAM0] = (a_haddr[31:11] == 21'h040000);
     assign hit[LST0] = (a_haddr[31:12] == 20'h20010);
     assign hit[PPU0] = (a_haddr[31:12] == 20'h30000);
     assign hit[TEXLD0] = (a_haddr[31:16] == 16'h3100);

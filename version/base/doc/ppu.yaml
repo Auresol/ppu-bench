@@ -28,7 +28,9 @@ registers:
     offset: 0x000
     reset: 0x00000000
     fields:
-      - {name: START, bits: [0], access: wf, desc: "write 1: render one frame from the next frame start; textures are locked from then on"}
+      - {name: START, bits: [0], access: wf, desc: "write 1: start rendering (one frame, or every frame with CONT); textures are locked from then on"}
+      - {name: CONT, bits: [1], access: rw, desc: "1: render every frame, not just one (the showcase firmware); 0: one frame per reset (the benchmark)"}
+      - {name: OAM_SEL, bits: [2], access: rw, desc: "the OAM bank the next frame reads (0: oam0 +0, 1: oam0 +0x400); latched at each frame's start, so the core writes the other"}
   - name: STATUS
     offset: 0x004
     reset: 0x00000000
@@ -52,7 +54,7 @@ registers:
     offset: 0x010
     reset: 0x00000000
     fields:
-      - {name: BITS, bits: [31, 0], access: ro, desc: "hit bit of sprites 32n .. 32n+31 (spec section 7)"}
+      - {name: BITS, bits: [31, 0], access: ro, desc: "hit bit of sprites 32n .. 32n+31 in the last finished frame (spec section 7)"}
   # performance counters (spec section 9): counted only while the frame renders (from its frame start to the blanking after line 479)
   - name: FRAME_CYC
     offset: 0x040
@@ -89,3 +91,8 @@ registers:
     reset: 0x00000000
     fields:
       - {name: COUNT, bits: [31, 0], access: ro, desc: "most slots waiting for a texture word at once"}
+  - name: FRAME
+    offset: 0x05C
+    reset: 0x00000000
+    fields:
+      - {name: COUNT, bits: [31, 0], access: ro, desc: "frames finished; HIT is that frame's, and the OAM bank of the next one is latched"}

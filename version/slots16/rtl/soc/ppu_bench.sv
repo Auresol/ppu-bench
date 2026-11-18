@@ -381,7 +381,7 @@ module ppu_bench (
     );
 
     // Peripherals
-    buf_bank #(.DEPTH(256)) oam0 (
+    buf_bank #(.DEPTH(512)) oam0 (
         .clk(clk_clk),
         .rst_n(rst_n_system),
         .haddr(s_oam0_haddr),

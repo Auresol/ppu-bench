@@ -64,7 +64,7 @@ void _bsp_putc(char c);                        // weak; the chip's own code writ
 
 // Peripheral base addresses
 #define OAM0_BASE                0x20000000
-#define OAM0_SIZE                0x400
+#define OAM0_SIZE                0x800
 #define LST0_BASE                0x20010000
 #define LST0_SIZE                0x1000
 #define GPIO0_BASE               0x40000000
@@ -109,10 +109,15 @@ void _bsp_putc(char c);                        // weak; the chip's own code writ
 #define PPU_ADM_WAIT                     0x050
 #define PPU_ADM_SLACK                    0x054
 #define PPU_TEX_WANT_PEAK                0x058
+#define PPU_FRAME                        0x05C
 
 // --- PPU fields ---
 #define PPU_CTRL_START_POS                       0
 #define PPU_CTRL_START_MASK                      (1U << 0)
+#define PPU_CTRL_CONT_POS                        1
+#define PPU_CTRL_CONT_MASK                       (1U << 1)
+#define PPU_CTRL_OAM_SEL_POS                     2
+#define PPU_CTRL_OAM_SEL_MASK                    (1U << 2)
 #define PPU_STATUS_DONE_POS                      0
 #define PPU_STATUS_DONE_MASK                     (1U << 0)
 #define PPU_STATUS_BUSY_POS                      1
@@ -147,6 +152,8 @@ void _bsp_putc(char c);                        // weak; the chip's own code writ
 #define PPU_ADM_SLACK_PIXELS_MASK                0xFFFFFFFFU
 #define PPU_TEX_WANT_PEAK_COUNT_POS              0
 #define PPU_TEX_WANT_PEAK_COUNT_MASK             0xFFFFFFFFU
+#define PPU_FRAME_COUNT_POS                      0
+#define PPU_FRAME_COUNT_MASK                     0xFFFFFFFFU
 
 // Register access
 #define REG32(base, offset)  (*(volatile uint32_t *)((base) + (offset)))
@@ -167,6 +174,7 @@ void _bsp_putc(char c);                        // weak; the chip's own code writ
 #define PPU0_ADM_WAIT                    REG32(PPU0_BASE, PPU_ADM_WAIT)
 #define PPU0_ADM_SLACK                   REG32(PPU0_BASE, PPU_ADM_SLACK)
 #define PPU0_TEX_WANT_PEAK               REG32(PPU0_BASE, PPU_TEX_WANT_PEAK)
+#define PPU0_FRAME                       REG32(PPU0_BASE, PPU_FRAME)
 
 // Pin functions: FUNCSEL numbers and the pins of each group
 #define FUNCSEL_RACER0                   1

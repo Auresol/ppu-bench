@@ -151,8 +151,8 @@ var chipSpecsGpio = []reg.Spec{
 
 // chipSpecsPpu are the registers of the module ppu, as its own testbench holds them (regs.Specs).
 var chipSpecsPpu = []reg.Spec{
-	{Name: "CTRL", Offset: 0x0, Reset: 0x0, Check: 0x0, WO: 0x0, RW: 0x0, Const: 0x0, W1C: 0x0, ReadEffect: false, WriteEffect: true,
-		Fields: []reg.Field{{Name: "START", Lo: 0, Hi: 0}}, Wen: "wen_ctrl"},
+	{Name: "CTRL", Offset: 0x0, Reset: 0x0, Check: 0x6, WO: 0x0, RW: 0x6, Const: 0x0, W1C: 0x0, ReadEffect: false, WriteEffect: true,
+		Fields: []reg.Field{{Name: "START", Lo: 0, Hi: 0}, {Name: "CONT", Lo: 1, Hi: 1}, {Name: "OAM_SEL", Lo: 2, Hi: 2}}, Wen: "wen_ctrl"},
 	{Name: "STATUS", Offset: 0x4, Reset: 0x0, Check: 0x3, WO: 0x0, RW: 0x0, Const: 0x0, W1C: 0x0, ReadEffect: false, WriteEffect: false,
 		Fields: []reg.Field{{Name: "DONE", Lo: 0, Hi: 0, HW: reg.HW{Access: "ro", Read: reg.W("status_done", 0, 1)}}, {Name: "BUSY", Lo: 1, Hi: 1, HW: reg.HW{Access: "ro", Read: reg.W("status_busy", 0, 1)}}}},
 	{Name: "LATE", Offset: 0x8, Reset: 0x0, Check: 0xffffffff, WO: 0x0, RW: 0x0, Const: 0x0, W1C: 0x0, ReadEffect: false, WriteEffect: false,
@@ -173,6 +173,8 @@ var chipSpecsPpu = []reg.Spec{
 		Fields: []reg.Field{{Name: "PIXELS", Lo: 0, Hi: 31, HW: reg.HW{Access: "ro", Read: reg.W("adm_slack_pixels", 0, 32)}}}},
 	{Name: "TEX_WANT_PEAK", Offset: 0x58, Reset: 0x0, Check: 0xffffffff, WO: 0x0, RW: 0x0, Const: 0x0, W1C: 0x0, ReadEffect: false, WriteEffect: false,
 		Fields: []reg.Field{{Name: "COUNT", Lo: 0, Hi: 31, HW: reg.HW{Access: "ro", Read: reg.W("tex_want_peak_count", 0, 32)}}}},
+	{Name: "FRAME", Offset: 0x5c, Reset: 0x0, Check: 0xffffffff, WO: 0x0, RW: 0x0, Const: 0x0, W1C: 0x0, ReadEffect: false, WriteEffect: false,
+		Fields: []reg.Field{{Name: "COUNT", Lo: 0, Hi: 31, HW: reg.HW{Access: "ro", Read: reg.W("frame_count", 0, 32)}}}},
 	{Name: "HIT0", Offset: 0x10, Reset: 0x0, Check: 0xffffffff, WO: 0x0, RW: 0x0, Const: 0x0, W1C: 0x0, ReadEffect: false, WriteEffect: false,
 		Fields: []reg.Field{{Name: "BITS", Lo: 0, Hi: 31, HW: reg.HW{Access: "ro", Read: reg.W("hit_bits", 0, 32)}}}},
 	{Name: "HIT1", Offset: 0x14, Reset: 0x0, Check: 0xffffffff, WO: 0x0, RW: 0x0, Const: 0x0, W1C: 0x0, ReadEffect: false, WriteEffect: false,

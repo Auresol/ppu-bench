@@ -8,3 +8,4 @@ __pycache__/
 version/base/fw/app.elf
 version/base/fw/app.bin
 .toolchain.lock
+version/base/fw/showcase/*.elf

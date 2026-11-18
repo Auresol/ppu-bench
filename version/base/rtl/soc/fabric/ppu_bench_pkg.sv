@@ -15,7 +15,7 @@ localparam logic [31:0] TEX0_BASE = 32'h0000_0000;
 localparam logic [31:0] TEX0_SIZE = 32'h0001_0000;
 localparam logic [31:0] SRAM_TOTAL = 32'h0002_0000;
 localparam logic [31:0] OAM0_BASE = 32'h2000_0000;
-localparam logic [31:0] OAM0_SIZE = 32'h0000_0400;
+localparam logic [31:0] OAM0_SIZE = 32'h0000_0800;
 localparam logic [31:0] LST0_BASE = 32'h2001_0000;
 localparam logic [31:0] LST0_SIZE = 32'h0000_1000;
 localparam logic [31:0] GPIO0_BASE = 32'h4000_0000;
@@ -41,8 +41,13 @@ localparam logic [31:0] PPU_SLOTS_PEAK = 32'h0000_004C;
 localparam logic [31:0] PPU_ADM_WAIT = 32'h0000_0050;
 localparam logic [31:0] PPU_ADM_SLACK = 32'h0000_0054;
 localparam logic [31:0] PPU_TEX_WANT_PEAK = 32'h0000_0058;
+localparam logic [31:0] PPU_FRAME = 32'h0000_005C;
 localparam int PPU_CTRL_START_POS = 0;
 localparam logic [31:0] PPU_CTRL_START_MASK = 32'h0000_0001;
+localparam int PPU_CTRL_CONT_POS = 1;
+localparam logic [31:0] PPU_CTRL_CONT_MASK = 32'h0000_0002;
+localparam int PPU_CTRL_OAM_SEL_POS = 2;
+localparam logic [31:0] PPU_CTRL_OAM_SEL_MASK = 32'h0000_0004;
 localparam int PPU_STATUS_DONE_POS = 0;
 localparam logic [31:0] PPU_STATUS_DONE_MASK = 32'h0000_0001;
 localparam int PPU_STATUS_BUSY_POS = 1;
@@ -77,6 +82,8 @@ localparam int PPU_ADM_SLACK_PIXELS_POS = 0;
 localparam logic [31:0] PPU_ADM_SLACK_PIXELS_MASK = 32'hFFFF_FFFF;
 localparam int PPU_TEX_WANT_PEAK_COUNT_POS = 0;
 localparam logic [31:0] PPU_TEX_WANT_PEAK_COUNT_MASK = 32'hFFFF_FFFF;
+localparam int PPU_FRAME_COUNT_POS = 0;
+localparam logic [31:0] PPU_FRAME_COUNT_MASK = 32'hFFFF_FFFF;
 
 // Registers of each peripheral instance: absolute addresses
 localparam logic [31:0] PPU0_CTRL = PPU0_BASE + PPU_CTRL;
@@ -94,6 +101,7 @@ localparam logic [31:0] PPU0_SLOTS_PEAK = PPU0_BASE + PPU_SLOTS_PEAK;
 localparam logic [31:0] PPU0_ADM_WAIT = PPU0_BASE + PPU_ADM_WAIT;
 localparam logic [31:0] PPU0_ADM_SLACK = PPU0_BASE + PPU_ADM_SLACK;
 localparam logic [31:0] PPU0_TEX_WANT_PEAK = PPU0_BASE + PPU_TEX_WANT_PEAK;
+localparam logic [31:0] PPU0_FRAME = PPU0_BASE + PPU_FRAME;
 
 // GPIO layout: CTRL fields, word register addresses, input select offsets
 localparam logic [31:0] GPIO_CTRL = GPIO0_BASE;

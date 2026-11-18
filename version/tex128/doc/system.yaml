@@ -22,7 +22,7 @@ instances:
   core0: {module: hazard3_cpu_2port, params: {EXTENSION_A: 0}}     # the bus master: a Hazard3 RISC-V core (vendor code, the submodule); its isa (rv32imc_zicsr) is derived from its parameters; A is off: the bus has no exclusive monitor
   sram0: {module: sram_bank, params: {DEPTH: 16384}}     # 16384 words of 4 bytes = 64kb; the program is baked in here, at address 0
   gpio0: {module: gpio}                                # generated from pinout.yaml
-  oam0: {module: buf_bank, params: {DEPTH: 256}}       # the sprite table: 128 sprites of 8 bytes = 1kb (spec/sprite-spec.md section 2)
+  oam0: {module: buf_bank, params: {DEPTH: 512}}       # the sprite table, two banks of 128 sprites x 8 bytes = 2kb (CTRL.OAM_SEL; spec/sprite-spec.md section 2)
   lst0: {module: buf_bank, params: {DEPTH: 1024}}      # the per-line sprite lists the render unit writes back: two lists (line y on show, line y+1 being built), 4kb
   ppu0: {module: ppu}                                  # the render unit: races the beam, streams each pixel into racer0
   racer0: {module: racer}                              # the VGA output unit: the stream VGA block (doc/vga.yaml), no buffer; colour bars until ppu0 starts
@@ -41,7 +41,7 @@ buses:
     masters: [ppu0.oam, core0.data, core0.instruction]     # the render unit first: it races the beam
     slaves:
       - {instance: sram0, base: 0x00000000, size: 64kb}
-      - {instance: oam0, base: 0x20000000, size: 1kb}
+      - {instance: oam0, base: 0x20000000, size: 2kb}
       - {instance: lst0, base: 0x20010000, size: 4kb}
       - {instance: ppu0.cfg, base: 0x30000000, size: 4kb}
       - {instance: texld0.cfg, base: 0x31000000, size: 64kb}   # mirrors bus tex one to one

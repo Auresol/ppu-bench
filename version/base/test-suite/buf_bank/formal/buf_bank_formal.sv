@@ -20,7 +20,7 @@ module buf_bank_formal (
 
     // The module under proof
     buf_bank #(
-        .DEPTH(256)
+        .DEPTH(512)
     ) dut (.*);
 
     // The properties

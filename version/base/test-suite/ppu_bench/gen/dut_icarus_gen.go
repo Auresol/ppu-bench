@@ -43,7 +43,7 @@ var icarusPorts = []icarus.Port{
 
 // icarusMacros are the hard macro instances of the chip (its SRAMs): in a netlist build the testbench may touch a path under one, and no other net
 // inside the chip (adr/gls/netlist-touches-only-ports-and-macros.md).
-var icarusMacros = []string{"sram0", "tex0"}
+var icarusMacros = []string{"sram0"}
 
 // model is the vvp child as a tb.DUT, tb.Timed and tb.Faulty (the methods of *icarus.Model); clk is the function of the Sim's clock.
 type model struct {
@@ -226,7 +226,7 @@ func (u *PpuBench) RunUntil(cond func() bool, max uint64) bool {
 	return u.Sim.WaitFor(tb.Func("cond", func(tb.View) bool { return cond() }), max)
 }
 
-// Regions are the RAM of the chip for tb.LoadELF: every memory: sram instance at its base on the bus map, with its backdoor Mem.
+// Regions are the RAM of the chip for tb.LoadELF: the memory: sram the cores that run software reach (every sram instance when there is no such core), at its base, with its backdoor Mem. A RAM on a private bus is u.Mem(name).
 func (u *PpuBench) Regions() []tb.Region {
 	var out []tb.Region
 	mems := u.Mems()
@@ -235,7 +235,6 @@ func (u *PpuBench) Regions() []tb.Region {
 		base     uint64
 	}{
 		{"sram0", 0x0},
-		{"tex0", 0x0},
 	} {
 		m, err := tb.FindMem(mems, r.instance)
 		if err != nil {
@@ -309,7 +308,7 @@ func (u *PpuBench) Internal(inst, name string) (tb.Out, error) {
 var chipMap = []fw.Window{
 	{"sram0", 0x0, 0x10000},
 	{"tex0", 0x0, 0x10000},
-	{"oam0", 0x20000000, 0x400},
+	{"oam0", 0x20000000, 0x800},
 	{"lst0", 0x20010000, 0x1000},
 	{"ppu0", 0x30000000, 0x1000},
 	{"texld0", 0x31000000, 0x10000},

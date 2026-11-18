@@ -12,6 +12,7 @@ import (
 	"debug/elf"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -204,12 +205,32 @@ func oneFrame(u *gen.PpuBench, workload string) {
 func capture(u *gen.PpuBench, readResult func() result) ([]uint16, result) {
 	s := u.Sim
 	p := pins{u}
+	lockRaster(u, func() string { return where(u, readResult) })
 
+	frame := make([]uint16, screenW*screenH)
+	for f := 0; f < maxFrames; f++ {
+		readFrame(u, frame)
+		// line 480: run into the blanking and ask the firmware
+		u.Run(20 * lineCycles)
+		if r := readResult(); r.done == 1 {
+			return frame, r
+		}
+		u.Run(uint64(frameLines-screenH-20) * lineCycles)
+	}
+	s.Fatalf("the render unit was not DONE after %d frames (STATUS.DONE never seen by the firmware)", maxFrames)
+	return nil, result{}
+}
+
+// lockRaster finds the raster from the sync pins and leaves the sim in the middle of pixel (0, 0) of the next frame.
+// why says where the program is, for the failure message when the pins never drive.
+func lockRaster(u *gen.PpuBench, why func() string) {
+	s := u.Sim
+	p := pins{u}
 	// 1. the column: the first cycle hsync is low is the first cycle of column 656. The pins drive once the firmware selects
 	//    them (FUNCSEL), so wait for a real falling edge, not the pad's level before that.
 	prev := p.hs()
 	if !u.RunUntil(func() bool { now := p.hs(); fell := prev == 1 && now == 0; prev = now; return fell }, 4*frameLines*lineCycles) {
-		s.Fatalf("no hsync edge on pad %d: the VGA pins never drove (is FUNCSEL of ppu0 selected?); %s", padHsync, where(u, readResult))
+		s.Fatalf("no hsync edge on pad %d: the VGA pins never drove (is FUNCSEL of racer0 selected?); %s", padHsync, why())
 	}
 	// 2. the line: step whole lines, sampling at column 656, until vsync falls (line 490)
 	sawHigh := false
@@ -229,31 +250,26 @@ func capture(u *gen.PpuBench, readResult func() result) ([]uint16, result) {
 	}
 	// now: column 656 of line 490. Go to the middle of pixel (0, 0) of the next frame.
 	u.Run(uint64((frameLines-vsyncLine)*lineCycles - hsyncCol*cyclesPerPixel + cyclesPerPixel/2))
+}
 
-	frame := make([]uint16, screenW*screenH)
-	for f := 0; f < maxFrames; f++ {
-		for y := 0; y < screenH; y++ {
-			row := frame[y*screenW : (y+1)*screenW]
-			for x := range row {
-				row[x] = p.rgb()
-				u.Run(cyclesPerPixel)
-			}
-			// in the blanking: check the raster is still where we think, then on to the next line
-			u.Run(uint64(700-screenW) * cyclesPerPixel)
-			if p.hs() != 0 {
-				s.Fatalf("lost the raster: hsync is not low at column 700 of line %d (cycle %d)", y, s.Cycle())
-			}
-			u.Run(uint64(lineCols-700) * cyclesPerPixel)
+// readFrame samples the 640x480 pixels of one frame from the pins, from the middle of pixel (0, 0); it ends in the middle of
+// pixel (0, 480), at the start of the vertical blanking.
+func readFrame(u *gen.PpuBench, frame []uint16) {
+	s := u.Sim
+	p := pins{u}
+	for y := 0; y < screenH; y++ {
+		row := frame[y*screenW : (y+1)*screenW]
+		for x := range row {
+			row[x] = p.rgb()
+			u.Run(cyclesPerPixel)
 		}
-		// line 480: run into the blanking and ask the firmware
-		u.Run(20 * lineCycles)
-		if r := readResult(); r.done == 1 {
-			return frame, r
+		// in the blanking: check the raster is still where we think, then on to the next line
+		u.Run(uint64(700-screenW) * cyclesPerPixel)
+		if p.hs() != 0 {
+			s.Fatalf("lost the raster: hsync is not low at column 700 of line %d (cycle %d)", y, s.Cycle())
 		}
-		u.Run(uint64(frameLines-screenH-20) * lineCycles)
+		u.Run(uint64(lineCols-700) * cyclesPerPixel)
 	}
-	s.Fatalf("the render unit was not DONE after %d frames (STATUS.DONE never seen by the firmware)", maxFrames)
-	return nil, result{}
 }
 
 // where says how far the program got, for a failure message: the core's fetch address and what bench_result holds.
@@ -283,7 +299,7 @@ func checkTextures(u *gen.PpuBench, dir string) {
 		s.Fatalf("%v (make -C bench)", err)
 	}
 	tex0, err := u.Mem("tex0")
-	if err != nil && strings.Contains(err.Error(), "backdoor not supported") {
+	if errors.Is(err, tb.ErrMemTooWide) {
 		// the backdoor reads words of up to 64 bits (a 128-bit bus tex is wider): the frame check still covers the textures
 		s.Logf("tex0 not checked: %v", err)
 		return

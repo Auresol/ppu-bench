@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """The benchmark table: python3 -I bench/results.py [results dir]
 
-Reads bench/build/results/<version>/<workload>.json (written by the one-frame tests, test-suite/ppu_bench/ppu_bench.go) and
-prints, as Markdown:
+Reads bench/build/results/<version>/<workload>.json (local runs of the one-frame tests, test-suite/ppu_bench/ppu_bench.go)
+or, given version/base/test-suite/build/rtl-stat-jobs, the summary.json of every fetched rtl-stat job, and prints, as Markdown:
   1. per workload and version: pass, or the late pixels
   2. per version: its capacity on the two ladders (the last depth_N and bw_N step it passes) and the counters of busy_screen
 """
 
+import glob
 import json
 import os
 import re
@@ -17,12 +18,27 @@ ORDER = ["base", "slots16", "slots24", "tex64", "tex128", "slots24-tex64"]
 
 
 def load(d):
+    """bench/build/results/<version>/<workload>.json of local runs, or the summary.json of rtl-stat jobs (fetched by
+    `rtl-stat-job report <job>` into test-suite/build/rtl-stat-jobs/<job>/rtl-stat/): both become the same record."""
     res = {}
-    for v in sorted(os.listdir(d)):
-        for f in sorted(os.listdir(os.path.join(d, v))):
-            if f.endswith(".json"):
-                r = json.load(open(os.path.join(d, v, f)))
-                res[(v, r["workload"])] = r
+    for f in sorted(glob.glob(os.path.join(d, "*", "*.json"))):
+        r = json.load(open(f))
+        res[(r["version"], r["workload"])] = r
+    for f in sorted(glob.glob(os.path.join(d, "*", "rtl-stat", "summary.json"))):
+        s = json.load(open(f))
+        version = s.get("chip_version") or "base"
+        for m in s.get("modules", []):
+            for c in m.get("cases", []):
+                met = {k: v["max"] for k, v in c.get("metrics", {}).items()}
+                if "late_pixels" not in met:
+                    continue
+                res[(version, c["name"])] = {
+                    "pass": c["status"] == "pass", "late_pixels": met["late_pixels"],
+                    "load": {"max_depth": met.get("load_max_depth")},
+                    "perf": {"frame_cycles": 10000, "tex_busy_cycles": met.get("tex_busy_pct_x100", 0),
+                             "main_busy_cycles": met.get("main_busy_pct_x100", 0),
+                             "adm_slack_pixels": met.get("adm_slack_pixels", 0x7FFF), "slots_peak": met.get("slots_peak")},
+                }
     return res
 
 
