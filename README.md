@@ -47,7 +47,7 @@ Seven versions, all at 50 MHz on the Basys3, post-route (Vivado):
 
 | Version | Slots | Tex bus | LUTs | FFs | WNS | Max stack, 4bpp 32×32 | Max stack, 8bpp 64×64 | Random scenes perfect |
 |---|---|---|---|---|---|---|---|---|
-| base | 8 | 32 | 8,436 (41%) | 8,715 (21%) | +2.39 ns | 4 | 0 | 0 of 16 ¹ |
+| base | 8 | 32 | 8,436 (41%) | 8,715 (21%) | +2.39 ns | 4 | 0 | 5 of 256 |
 | slots16 | 16 | 32 | 11,213 (54%) | 11,316 (27%) | +1.88 ns | 4 | 0 | 5 of 256 |
 | slots24 | 24 | 32 | 13,894 (67%) | 13,945 (34%) | +1.03 ns | 4 | 0 | 5 of 256 |
 | tex64 | 8 | 64 | 9,901 (48%) | 9,249 (22%) | +1.18 ns | 8 | 2 | 255 of 256 |
@@ -55,7 +55,7 @@ Seven versions, all at 50 MHz on the Basys3, post-route (Vivado):
 | slots24-tex64 | 24 | 64 | 15,622 (75%) | 15,512 (37%) | +1.22 ns | 24 | 2 | 255 of 256 |
 | slots24-tex128 | 24 | 128 | 16,096 (77%) | 18,478 (44%) | +0.11 ns | 24 | 10 | 256 of 256 |
 
-Block RAM is 34.5 of 50 tiles (69%) in every version. ¹ The 256-seed run of base was not finished when this was written.
+Block RAM is 34.5 of 50 tiles (69%) in every version.
 
 - **At 50 MHz, texture bandwidth decides.** A 32-bit texture bus streams ~21 bits a pixel, a 64-bit one ~43, a 128-bit one
   ~85. On random scenes (16 to 127 sprites anywhere, at most 6 deep) every 32-bit version fails almost every scene; 64 bits
