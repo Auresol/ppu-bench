@@ -1,5 +1,5 @@
-// The showcase library (ppu_lib.h). The sprite format is spec/sprite-spec.md section 2.
-#include "ppu_lib.h"
+// libppu, the core: palette, textures, sprites, the frame loop (ppu.h). The sprite format is spec/sprite-spec.md section 2.
+#include "ppu.h"
 
 #define TEX_BYTES  0x10000u                 // tex0: 64 kb
 #define PAL_BYTES  512u
@@ -20,7 +20,7 @@ tex_t tex_alloc(int w, int h, int bpp8)
     uint32_t bytes = (uint32_t)(w * h) / (bpp8 ? 1u : 2u);
     tex_next = (tex_next + bytes + 31u) & ~31u;
     if (tex_next > TEX_BYTES)
-        for (;;) leds(0xFFFFu);              // out of texture memory: all LEDs on, stop
+        for (;;) ppu_leds(0xFFFFu);          // out of texture memory: all LEDs on, stop
     return t;
 }
 
@@ -122,11 +122,14 @@ void ppu_start(uint32_t giant)
     PPU0_CTRL = (1u << PPU_CTRL_START_POS) | (1u << PPU_CTRL_CONT_POS);
 }
 
-// what the simulation reads (the showcase tests, through the SRAM backdoor, by symbol): frames finished and late pixels
-volatile struct { uint32_t frames, late; } showcase_status;
+volatile struct ppu_status showcase_status;
 
 void ppu_wait_frame(void)
 {
+    // a frame that finished before we came back is one the program missed: its sprite table was the old one again
+    uint32_t now = PPU0_FRAME;
+    if (now != last_frame)
+        showcase_status.missed += now - last_frame;
     while (PPU0_FRAME == last_frame)
         ;
     last_frame = PPU0_FRAME;
@@ -143,16 +146,3 @@ void ppu_present(void)
 int      ppu_hit(int i)  { return (int)((REG32(PPU0_BASE, PPU_HIT0 + 4 * (i / 32)) >> (i % 32)) & 1u); }
 uint32_t ppu_frame(void) { return PPU0_FRAME; }
 uint32_t ppu_late(void)  { return PPU0_LATE; }
-
-static uint32_t rnd_state = 0x2545F491u;
-uint32_t rnd(void)
-{
-    uint32_t x = rnd_state;
-    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
-    return rnd_state = x;
-}
-int rnd_range(int lo, int hi) { return lo + (int)(rnd() % (uint32_t)(hi - lo)); }
-
-uint32_t buttons(void)  { return GPIO_IN(1) & 15u; }
-uint32_t switches(void) { return (GPIO_IN(0) >> 16) & 0xFFFFu; }
-void     leds(uint32_t v) { GPIO_OUT(0) = v & 0xFFFFu; }

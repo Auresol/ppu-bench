@@ -9,3 +9,5 @@ version/base/fw/app.bin
 version/base/fw/showcase/*.elf
 version/base/fw/bench/bench.elf
 version/base/fw/bench/.build.lock
+version/base/fw/lib/ppu/*.o
+version/base/fw/lib/ppu/libppu.a

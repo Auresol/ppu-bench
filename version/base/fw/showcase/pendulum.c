@@ -4,34 +4,15 @@
 // Drawn: the pivot, the rods as rows of dots, the two bobs, and a fading trail of the lower bob over a giant grid.
 //
 // Basys3: the up button kicks the pendulum, the down button starts it again. Switch 0 hides the trail.
-#include "ppu_lib.h"
+#include "ppu.h"
 
-enum { S_PIVOT = 0, S_BOB1 = 1, S_BOB2 = 2, S_ROD = 3, N_ROD = 22, S_TRAIL = 32, N_TRAIL = 64, S_GRID = 127 };
-enum { P_GRID = 0, P_ROD = 1, P_BOB1 = 2, P_BOB2 = 3, P_TRAIL = 4 };   // P_TRAIL .. P_TRAIL+3: the trail, newest first
+enum { S_PIVOT = 0, S_BOB1 = 1, S_BOB2 = 2, S_ROD = 3, N_ROD = 22, S_TRAIL = 32, N_TRAIL = 64, S_TEXT = 100, S_GRID = 127 };
+enum { P_GRID = 0, P_ROD = 1, P_BOB1 = 2, P_BOB2 = 3, P_TRAIL = 4, P_TEXT = 8 };   // P_TRAIL .. P_TRAIL+3: the trail, newest first
 
 #define PIVOT_X 320
 #define PIVOT_Y 120
 #define LEN_PX  110.0f            // one rod on screen
 #define DOTS    11                // dots on a rod
-
-// ---- float helpers (no libm) ----
-#define PI 3.14159265f
-static float wrap_pi(float a)
-{
-    while (a > PI) a -= 2 * PI;
-    while (a < -PI) a += 2 * PI;
-    return a;
-}
-static float fsin(float x)        // |error| < 1e-6 on [-pi, pi]
-{
-    x = wrap_pi(x);
-    if (x > PI / 2) x = PI - x;
-    else if (x < -PI / 2) x = -PI - x;
-    float x2 = x * x;
-    return x * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42 * (1 - x2 / 72 * (1 - x2 / 110)))));
-}
-static float fcos(float x) { return fsin(x + PI / 2); }
-static int iround(float f) { return (int)(f < 0 ? f - 0.5f : f + 0.5f); }
 
 // ---- the physics: state (t1, t2, w1, w2), g/l = 9.81 with l = 1 ----
 typedef struct { float t1, t2, w1, w2; } state_t;
@@ -39,10 +20,10 @@ static const float G = 9.81f;
 
 static state_t deriv(state_t s)
 {
-    float d = s.t1 - s.t2, sd = fsin(d), cd = fcos(d);
-    float den = 3 - fcos(2 * d);                 // 2 m1 + m2 - m2 cos 2d, m1 = m2 = 1
-    float a1 = (-G * 3 * fsin(s.t1) - G * fsin(s.t1 - 2 * s.t2) - 2 * sd * (s.w2 * s.w2 + s.w1 * s.w1 * cd)) / den;
-    float a2 = (2 * sd * (s.w1 * s.w1 * 2 + G * 2 * fcos(s.t1) + s.w2 * s.w2 * cd)) / den;
+    float d = s.t1 - s.t2, sd = ppu_sin(d), cd = ppu_cos(d);
+    float den = 3 - ppu_cos(2 * d);                 // 2 m1 + m2 - m2 cos 2d, m1 = m2 = 1
+    float a1 = (-G * 3 * ppu_sin(s.t1) - G * ppu_sin(s.t1 - 2 * s.t2) - 2 * sd * (s.w2 * s.w2 + s.w1 * s.w1 * cd)) / den;
+    float a2 = (2 * sd * (s.w1 * s.w1 * 2 + G * 2 * ppu_cos(s.t1) + s.w2 * s.w2 * cd)) / den;
     return (state_t){s.w1, s.w2, a1, a2};
 }
 static state_t axpy(state_t a, float h, state_t b)
@@ -90,22 +71,23 @@ static void palette(void)
     pal_set(P_BOB2 * 16 + 1, RGB(6, 5, 0)); pal_set(P_BOB2 * 16 + 2, RGB(15, 12, 1)); pal_set(P_BOB2 * 16 + 3, RGB(15, 15, 11));
     static const uint16_t fade[4] = {RGB(15, 13, 3), RGB(11, 8, 2), RGB(7, 5, 2), RGB(4, 3, 2)};
     for (int k = 0; k < 4; k++) pal_set((P_TRAIL + k) * 16 + 1, fade[k]);
+    pal_set(P_TEXT * 16 + 1, RGB(11, 13, 15));
 }
 
 static state_t start_state(void) { return (state_t){2.2f, 2.6f, 0.0f, 0.0f}; }
 
 static void draw(state_t s)
 {
-    float x1 = LEN_PX * fsin(s.t1), y1 = LEN_PX * fcos(s.t1);
-    float x2 = x1 + LEN_PX * fsin(s.t2), y2 = y1 + LEN_PX * fcos(s.t2);
-    int bx1 = PIVOT_X + iround(x1), by1 = PIVOT_Y + iround(y1), bx2 = PIVOT_X + iround(x2), by2 = PIVOT_Y + iround(y2);
+    float x1 = LEN_PX * ppu_sin(s.t1), y1 = LEN_PX * ppu_cos(s.t1);
+    float x2 = x1 + LEN_PX * ppu_sin(s.t2), y2 = y1 + LEN_PX * ppu_cos(s.t2);
+    int bx1 = PIVOT_X + ppu_round(x1), by1 = PIVOT_Y + ppu_round(y1), bx2 = PIVOT_X + ppu_round(x2), by2 = PIVOT_Y + ppu_round(y2);
 
     spr_clear();
     spr(S_PIVOT, PIVOT_X - 4, PIVOT_Y - 4, t_pivot, P_ROD, 0, 0);
     for (int k = 0; k < DOTS; k++) {          // dots along each rod, centred on the line
         float f = (float)(k + 1) / (DOTS + 1);
-        spr(S_ROD + k, PIVOT_X + iround(x1 * f) - 4, PIVOT_Y + iround(y1 * f) - 4, t_dot, P_ROD, 1, 0);
-        spr(S_ROD + DOTS + k, bx1 + iround((x2 - x1) * f) - 4, by1 + iround((y2 - y1) * f) - 4, t_dot, P_ROD, 1, 0);
+        spr(S_ROD + k, PIVOT_X + ppu_round(x1 * f) - 4, PIVOT_Y + ppu_round(y1 * f) - 4, t_dot, P_ROD, 1, 0);
+        spr(S_ROD + DOTS + k, bx1 + ppu_round((x2 - x1) * f) - 4, by1 + ppu_round((y2 - y1) * f) - 4, t_dot, P_ROD, 1, 0);
     }
     spr(S_BOB1, bx1 - 16, by1 - 16, t_bob, P_BOB1, 0, 0);
     spr(S_BOB2, bx2 - 16, by2 - 16, t_bob, P_BOB2, 0, 0);
@@ -118,11 +100,12 @@ static void draw(state_t s)
         trail_x[trail_head] = bx2; trail_y[trail_head] = by2;
         if (trail_n < N_TRAIL) trail_n++;
     }
-    if (!(switches() & 1u))
+    if (!(ppu_switches() & 1u))
         for (int k = 0; k < trail_n; k++) {
             int i = (trail_head - k + N_TRAIL) % N_TRAIL;
             spr(S_TRAIL + k, trail_x[i] - 4, trail_y[i] - 4, t_dot, P_TRAIL + k * 4 / N_TRAIL, 2, 0);
         }
+    text(S_TEXT, 24, 20, "DOUBLE PENDULUM - RK4", P_TEXT, 0);
     spr(S_GRID, 0, 0, t_grid, P_GRID, 3, SPR_GIANT);
 }
 
@@ -134,19 +117,20 @@ int main(void)
     t_pivot = tex_art(pivot_art, 8, 8, 1);
     t_bob = tex_fn(32, 32, 0, bob);
     t_grid = tex_fn(320, 240, 0, grid);
+    text_init(2);
 
     state_t s = start_state();
     draw(s);
-    ppu_start(320u | 240u << 10 | 1u << 20);
+    ppu_start(GIANT_SIZE(320, 240, 1));
     uint32_t last = 0;
     for (;;) {
         ppu_wait_frame();
-        uint32_t b = buttons();
-        if ((b & 1u) && !(last & 1u)) s.w2 += 6.0f;                          // up: a kick
-        if ((b & 8u) && !(last & 8u)) { s = start_state(); trail_n = 0; }    // down: again
+        uint32_t b = ppu_buttons();
+        if ((b & BTN_UP) && !(last & BTN_UP)) s.w2 += 6.0f;                          // up: a kick
+        if ((b & BTN_DOWN) && !(last & BTN_DOWN)) { s = start_state(); trail_n = 0; }    // down: again
         last = b;
         for (int k = 0; k < 4; k++) s = rk4(s, 1.0f / 240);
-        s.t1 = wrap_pi(s.t1); s.t2 = wrap_pi(s.t2);
+        s.t1 = ppu_wrap_pi(s.t1); s.t2 = ppu_wrap_pi(s.t2);
         draw(s);
         ppu_present();
     }

@@ -4,7 +4,7 @@
 //
 // Basys3: left/right buttons move, up fires. With no button for two seconds the ship flies itself (the simulation and an
 // idle board show the attract mode). LEDs: the lives left.
-#include "ppu_lib.h"
+#include "ppu.h"
 
 // ---- sprite table layout ----
 enum {
@@ -13,7 +13,7 @@ enum {
     S_SHOT = 33,  N_SHOT = 16,       // the ship's bullets
     S_BOMB = 49,  N_BOMB = 16,       // the enemies' bullets
     S_BOOM = 65,  N_BOOM = 16,       // explosions
-    S_SCORE = 100, N_DIGITS = 6,
+    S_SCORE = 100, N_DIGITS = 6,     // the score: text_number, one sprite a digit
     S_STARS = 126,                   // and 127: two giant sprites, stacked, scrolling down
 };
 
@@ -117,20 +117,6 @@ static const char *const boom2_art[16] = {
     "...3....3....3..",
     "..3...3...3...3.",
 };
-// digits 0..9, 3x5 in an 8x8 cell
-static const char *const font[10][8] = {
-    {"111.....", "1.1.....", "1.1.....", "1.1.....", "111.....", "........", "........", "........"},
-    {".1......", "11......", ".1......", ".1......", "111.....", "........", "........", "........"},
-    {"111.....", "..1.....", "111.....", "1.......", "111.....", "........", "........", "........"},
-    {"111.....", "..1.....", "111.....", "..1.....", "111.....", "........", "........", "........"},
-    {"1.1.....", "1.1.....", "111.....", "..1.....", "..1.....", "........", "........", "........"},
-    {"111.....", "1.......", "111.....", "..1.....", "111.....", "........", "........", "........"},
-    {"111.....", "1.......", "111.....", "1.1.....", "111.....", "........", "........", "........"},
-    {"111.....", "..1.....", "..1.....", "..1.....", "..1.....", "........", "........", "........"},
-    {"111.....", "1.1.....", "111.....", "1.1.....", "111.....", "........", "........", "........"},
-    {"111.....", "1.1.....", "111.....", "..1.....", "111.....", "........", "........", "........"},
-};
-
 static uint8_t star(int u, int v)
 {
     uint32_t h = (uint32_t)u * 0x9E3779B1u ^ (uint32_t)v * 0x85EBCA77u;
@@ -139,7 +125,7 @@ static uint8_t star(int u, int v)
     return (uint8_t)(1 + (h >> 8) % 5);
 }
 
-static tex_t t_ship, t_enemy[2], t_shot, t_bomb, t_boom[2], t_digit[10], t_stars;
+static tex_t t_ship, t_enemy[2], t_shot, t_bomb, t_boom[2], t_stars;
 
 // ---- the game ----
 typedef struct { int x, y, on; uint16_t id; } obj_t;
@@ -169,7 +155,7 @@ static void explode(int x, int y)
 
 static int overlap(const obj_t *a, int aw, int ah, const obj_t *b, int bw, int bh)
 {
-    return a->x < b->x + bw && b->x < a->x + aw && a->y < b->y + bh && b->y < a->y + ah;
+    return rect_overlap(a->x, a->y, aw, ah, b->x, b->y, bw, bh);
 }
 
 // HIT is of the frame that just ended, which showed the bank this iteration is about to write again: its snapshot says
@@ -203,11 +189,11 @@ static void collide(void)
 
 static void steer(int *dx, int *fire)
 {
-    uint32_t b = buttons();
+    uint32_t b = ppu_buttons();
     idle_frames = b ? 0 : idle_frames + 1;
     if (idle_frames < 120) {                       // a player
-        *dx = (b & 2u) ? -5 : (b & 4u) ? 5 : 0;
-        *fire = (b & 1u) != 0;
+        *dx = (b & BTN_LEFT) ? -5 : (b & BTN_RIGHT) ? 5 : 0;
+        *fire = (b & BTN_UP) != 0;
         return;
     }
     // attract mode: under the lowest enemy of the nearest column, away from bombs, always firing
@@ -282,8 +268,7 @@ static void draw(void)
         if (bomb[b].on) spr(S_BOMB + b, bomb[b].x, bomb[b].y, t_bomb, P_BOMB, 0, SPR_HITBOX);
     for (int i = 0; i < N_BOOM; i++)
         if (boom[i].life) spr(S_BOOM + i, boom[i].x, boom[i].y, t_boom[boom[i].life < 12], P_BOOM, 0, 0);
-    for (int d = 0, v = score; d < N_DIGITS; d++, v /= 10)
-        spr(S_SCORE + d, 16 + (N_DIGITS - 1 - d) * 16, 12, t_digit[v % 10], P_TEXT, 0, 0);
+    text_number(S_SCORE, 16, 12, (uint32_t)score, N_DIGITS, P_TEXT, 0);
     spr(S_STARS, 0, scroll, t_stars, P_STARS, 3, SPR_GIANT);
     spr(S_STARS + 1, 0, scroll - 480, t_stars, P_STARS, 3, SPR_GIANT);
 
@@ -293,7 +278,7 @@ static void draw(void)
     for (int e = 0; e < N_ENEMY; e++) snap_enemy[back][e] = enemy[e];
     for (int s = 0; s < N_SHOT; s++) snap_shot[back][s] = shot[s];
     for (int b = 0; b < N_BOMB; b++) snap_bomb[back][b] = bomb[b];
-    leds((1u << (lives > 0 ? lives : 0)) - 1u);
+    ppu_leds((1u << (lives > 0 ? lives : 0)) - 1u);
 }
 
 static void palette(void)
@@ -324,7 +309,7 @@ int main(void)
     t_bomb = tex_art(bomb_art, 8, 8, 1);
     t_boom[0] = tex_art(boom1_art, 16, 16, 2);
     t_boom[1] = tex_art(boom2_art, 16, 16, 2);
-    for (int d = 0; d < 10; d++) t_digit[d] = tex_art(font[d], 8, 8, 2);
+    text_init(2);
     t_stars = tex_fn(320, 240, 0, star);
 
     idle_frames = 1000;                 // start in attract mode
@@ -332,7 +317,7 @@ int main(void)
     new_wave();
     back = 1;
     draw();                             // bank 1, which ppu_start copies to bank 0 for the first frame
-    ppu_start(320u | 240u << 10 | 1u << 20);
+    ppu_start(GIANT_SIZE(320, 240, 1));
     back = 1;
     for (;;) {
         ppu_wait_frame();
