@@ -138,7 +138,7 @@ static int form_x, form_y, form_dir = 1, wave;
 
 // what each bank was written with: HIT of a frame belongs to the bank it showed (see collide())
 static obj_t snap_ship[2], snap_enemy[2][N_ENEMY], snap_shot[2][N_SHOT], snap_bomb[2][N_BOMB];
-static unsigned back;   // the bank this iteration writes: 1, 0, 1, ... (ppu_lib's back bank)
+static unsigned back;   // the bank this iteration writes: 1, 0, 1, ... (libppu's back bank)
 
 static void new_wave(void)
 {
