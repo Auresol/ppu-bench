@@ -11,6 +11,7 @@
 //	stack_7/16      7 or 16 sprites on the same pixels over the background: 8 or 17 deep
 //	bandwidth_8bpp  6 overlapping 64x64 8bpp sprites: a texture word every 4 pixels each
 //	busy_screen     all 128 sprites: the background and 127 random ones (seed fixed)
+//	pile_96         96 8x8 sprites on one spot at the top left: far more than the slots, all but one hidden
 //	depth_N, bw_N   the ladders (category bench): N deep (N-1 stacked 32x32 4bpp), N overlapping 64x64 8bpp
 //	admit_N         the admission ladder (bench): N 8x8 sprites spread along one line band, 2 deep, light on bandwidth
 package ppubench
@@ -350,6 +351,22 @@ func (x *xorshift) n(k int) int {
 	return int(v % uint32(k))
 }
 
+// pile: n identical 8x8 sprites on the same spot at the top left, each its own palette bank. Only the front one is seen;
+// the renderer cannot know that until it reads texels, so every one must be in a slot, more than there are.
+func pile(n int) func() *workload {
+	return func() *workload {
+		wl := newWorkload(fmt.Sprintf("pile_%d", n), fmt.Sprintf("%d 8x8 sprites on one spot at the top left", n))
+		stdPalette(wl)
+		bgTex := background(wl)
+		tile := wl.texture(8, 8, false, func(u, v int) int { return 1 + (u+v)%3 })
+		for i := 0; i < n; i++ {
+			wl.sprite(tile, 0, 0, spr{pal: 1 + i%3})
+		}
+		bg(wl, bgTex)
+		return wl
+	}
+}
+
 // ---- the ladders ----
 
 var depthSteps = []int{4, 8, 12, 16, 20, 24}
@@ -411,6 +428,7 @@ var workloads = func() map[string]func() *workload {
 	m := map[string]func() *workload{
 		"empty_black": emptyBlack, "sprites_basic": spritesBasic, "sparse": sparse, "line_storm": lineStorm,
 		"stack_7": stack(7), "stack_16": stack(16), "bandwidth_8bpp": bandwidth8bpp, "busy_screen": busyScreen,
+		"pile_96": pile(96),
 	}
 	for _, n := range depthSteps {
 		m[fmt.Sprintf("depth_%d", n)] = depthN(n)

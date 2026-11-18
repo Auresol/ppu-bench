@@ -43,6 +43,7 @@ func (t *T) Stack7(u *gen.PpuBench)        { oneFrame(u, "stack_7") }
 func (t *T) Stack16(u *gen.PpuBench)       { oneFrame(u, "stack_16") }
 func (t *T) Bandwidth8bpp(u *gen.PpuBench) { oneFrame(u, "bandwidth_8bpp") }
 func (t *T) BusyScreen(u *gen.PpuBench)    { oneFrame(u, "busy_screen") }
+func (t *T) Pile96(u *gen.PpuBench)        { oneFrame(u, "pile_96") }
 
 // sweep: the depth and bandwidth ladders (model/workloads.py)
 func (t *T) Depth4(u *gen.PpuBench)   { oneFrame(u, "depth_4") }

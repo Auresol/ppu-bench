@@ -52,6 +52,8 @@ type PpuBenchTests interface {
 	BusyScreen(u *PpuBench)
 	// stress/line_storm: 80 sprites side by side on the same lines (81 on a line, 2 deep)
 	LineStorm(u *PpuBench)
+	// stress/pile_96: 96 8x8 sprites on one spot at the top left: far more than the slots, all but one hidden
+	Pile96(u *PpuBench)
 	// stress/sparse: 4 small sprites on the backdrop: the light case
 	Sparse(u *PpuBench)
 	// stress/stack_16: 16 sprites on the same pixels over the background: 17 deep
@@ -104,6 +106,8 @@ func (PpuBenchDefaults) BusyScreen(u *PpuBench) { u.Sim.NotWritten() }
 
 func (PpuBenchDefaults) LineStorm(u *PpuBench) { u.Sim.NotWritten() }
 
+func (PpuBenchDefaults) Pile96(u *PpuBench) { u.Sim.NotWritten() }
+
 func (PpuBenchDefaults) Sparse(u *PpuBench) { u.Sim.NotWritten() }
 
 func (PpuBenchDefaults) Stack16(u *PpuBench) { u.Sim.NotWritten() }
@@ -155,6 +159,8 @@ type PpuBenchEnvTests[E any] interface {
 	BusyScreen(u *PpuBench, e *E)
 	// stress/line_storm: 80 sprites side by side on the same lines (81 on a line, 2 deep)
 	LineStorm(u *PpuBench, e *E)
+	// stress/pile_96: 96 8x8 sprites on one spot at the top left: far more than the slots, all but one hidden
+	Pile96(u *PpuBench, e *E)
 	// stress/sparse: 4 small sprites on the backdrop: the light case
 	Sparse(u *PpuBench, e *E)
 	// stress/stack_16: 16 sprites on the same pixels over the background: 17 deep
@@ -206,6 +212,8 @@ func (PpuBenchEnvDefaults[E]) BusyScreen(u *PpuBench, _ *E) { u.Sim.NotWritten()
 
 func (PpuBenchEnvDefaults[E]) LineStorm(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
+func (PpuBenchEnvDefaults[E]) Pile96(u *PpuBench, _ *E) { u.Sim.NotWritten() }
+
 func (PpuBenchEnvDefaults[E]) Sparse(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
 func (PpuBenchEnvDefaults[E]) Stack16(u *PpuBench, _ *E) { u.Sim.NotWritten() }
@@ -213,7 +221,7 @@ func (PpuBenchEnvDefaults[E]) Stack16(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 func (PpuBenchEnvDefaults[E]) Stack7(u *PpuBench, _ *E) { u.Sim.NotWritten() }
 
 // Methods are the Go names of the declared tests, for run.Orphans.
-var Methods = []string{"Admit120", "Admit32", "Admit64", "Admit96", "Bw10", "Bw2", "Bw4", "Bw6", "Bw8", "Depth12", "Depth16", "Depth20", "Depth24", "Depth4", "Depth8", "EmptyBlack", "SpritesBasic", "Bandwidth8bpp", "BusyScreen", "LineStorm", "Sparse", "Stack16", "Stack7"}
+var Methods = []string{"Admit120", "Admit32", "Admit64", "Admit96", "Bw10", "Bw2", "Bw4", "Bw6", "Bw8", "Depth12", "Depth16", "Depth20", "Depth24", "Depth4", "Depth8", "EmptyBlack", "SpritesBasic", "Bandwidth8bpp", "BusyScreen", "LineStorm", "Pile96", "Sparse", "Stack16", "Stack7"}
 
 // Cases are the declared tests, each on a fresh model, reset first.
 func Cases(t PpuBenchTests) []run.Case {
@@ -317,6 +325,11 @@ func Cases(t PpuBenchTests) []run.Case {
 			u := Bind(s)
 			u.Reset()
 			t.LineStorm(u)
+		}},
+		{Name: "pile_96", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			u.Reset()
+			t.Pile96(u)
 		}},
 		{Name: "sparse", Category: "stress", Body: func(s *tb.Sim) {
 			u := Bind(s)
@@ -458,6 +471,12 @@ func EnvCases[E any](t PpuBenchEnvTests[E]) []run.Case {
 			e := t.Env(u)
 			u.Reset()
 			t.LineStorm(u, e)
+		}},
+		{Name: "pile_96", Category: "stress", Body: func(s *tb.Sim) {
+			u := Bind(s)
+			e := t.Env(u)
+			u.Reset()
+			t.Pile96(u, e)
 		}},
 		{Name: "sparse", Category: "stress", Body: func(s *tb.Sim) {
 			u := Bind(s)
