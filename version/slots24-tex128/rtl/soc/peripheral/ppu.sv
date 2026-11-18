@@ -499,7 +499,12 @@ wire ev_gate = (est == E_PREP || est == E_RUN) && ($signed({2'b00, E}) <= fl + 1
 assign ev_req  = (evs == EV_RD) || (evs == EV_WR);
 assign ev_we   = (evs == EV_WR);
 assign ev_addr = (evs == EV_WR) ? LST_BASE + {22'd0, E[0], ev_n, 2'b00} : OAM_BASE + {21'd0, oam_bank, ev_i, 3'b000};
-assign ev_wd   = {17'd0, hv[E[0]][ev_bin], hp[E[0]][ev_bin], ev_i};   // push front: the entry links to the bin's old head
+// a list entry: [6:0] the sprite, [13:7] the next entry, [14] there is one (push front: it links to the bin's old head),
+// [24:15] the sprite's right edge on the screen, clamped to 0..1023: admission skips a sprite the beam has passed from this
+// alone, without reading its OAM words
+wire signed [12:0] e_xe  = e_x + e_Wd;
+wire [9:0]         e_xe_c = (e_xe < 0) ? 10'd0 : (e_xe > 13'sd1023) ? 10'd1023 : e_xe[9:0];
+assign ev_wd   = {7'd0, e_xe_c, hv[E[0]][ev_bin], hp[E[0]][ev_bin], ev_i};
 
 // ---- admission ----
 typedef enum logic [3:0] {AD_IDLE, AD_WAIT, AD_BIN, AD_RDL, AD_RD0, AD_RD1, AD_C1, AD_C2, AD_C3, AD_LOAD, AD_END} adst_t;
@@ -542,6 +547,9 @@ end
 wire ad_passed = (est == E_RUN) && (($signed({2'b00, L}) < fl) ||
                                      ($signed({2'b00, L}) == fl && $signed({3'b000, cx}) >= a_xe));
 wire adm_load  = (ads == AD_LOAD) && have_free && !ad_passed;
+// the same from the list entry being read (its right edge, [24:15]): decided before any OAM read
+wire list_passed = (est == E_RUN) && (($signed({2'b00, L}) < fl) ||
+                                       ($signed({2'b00, L}) == fl && {3'b000, cx} >= {3'b000, a_hrdata[24:15]}));
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -595,7 +603,12 @@ always_ff @(posedge clk or negedge rst_n) begin
                 else ad_b <= ad_b + 6'd1;
             end
             AD_RDL: if (ad_done) begin
-                ad_idx <= a_hrdata[6:0]; ad_nx <= a_hrdata[13:7]; ad_nv <= a_hrdata[14]; ads <= AD_RD0;
+                ad_idx <= a_hrdata[6:0]; ad_nx <= a_hrdata[13:7]; ad_nv <= a_hrdata[14];
+                if (list_passed) begin                     // the beam is past it: the next entry, no OAM read
+                    if (a_hrdata[14]) ad_p <= a_hrdata[13:7];
+                    else begin ad_b <= ad_b + 6'd1; ads <= AD_BIN; end
+                end else
+                    ads <= AD_RD0;
             end
             AD_RD0: if (ad_done) begin ad_w0 <= a_hrdata; ads <= AD_RD1; end
             AD_RD1: if (ad_done) begin ad_w1 <= a_hrdata; ads <= AD_C1; end
