@@ -12,7 +12,6 @@ import (
 	"debug/elf"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -204,7 +203,6 @@ func oneFrame(u *gen.PpuBench, workload string) {
 // line 479, so it is seen in the vertical blanking that follows that frame, long before the next one starts.
 func capture(u *gen.PpuBench, readResult func() result) ([]uint16, result) {
 	s := u.Sim
-	p := pins{u}
 	lockRaster(u, func() string { return where(u, readResult) })
 
 	frame := make([]uint16, screenW*screenH)
@@ -299,7 +297,8 @@ func checkTextures(u *gen.PpuBench, dir string) {
 		s.Fatalf("%v (make -C bench)", err)
 	}
 	tex0, err := u.Mem("tex0")
-	if errors.Is(err, tb.ErrMemTooWide) {
+	// the text of tb.ErrMemTooWide: hw-proj before 6451f7ff8 (still on some job hosts) has the message but not the error value
+	if err != nil && strings.Contains(err.Error(), "backdoor not supported") {
 		// the backdoor reads words of up to 64 bits (a 128-bit bus tex is wider): the frame check still covers the textures
 		s.Logf("tex0 not checked: %v", err)
 		return
