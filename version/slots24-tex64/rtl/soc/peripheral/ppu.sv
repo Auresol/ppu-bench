@@ -391,35 +391,56 @@ logic [KW-1:0]       stag  [A][2];
 logic                sbv   [A][2];
 logic                spend [A];                              // a fetch is on bus tex
 
-// ---- S0: every slot's texel at (cx, cy), combinational ----
-logic                c_cov [A], c_opq [A], c_late [A];
+// ---- S0: every slot's texel at (cx, cy) ----
+// A pixel is 4 cycles and (cx, cy) holds for all of them, so S0 is two registered steps that run every cycle and settle well
+// before the pix_stb that samples them (10 ns each at 100 MHz, not one 40 ns path):
+//   P1  the position: the texel's word number and bit offset, and whether the slot covers the pixel (geometry)
+//   P2  the texel: the word from the slot's buffer, its tag check, the colour index
+// They see the slot's state 1 and 2 cycles late. A sprite loaded in that window is taken care of by adm_safe (its frontier is
+// 3 cycles late too); a texture word that lands in it counts as late, which is safe.
+logic                c_cov [A], c_opq [A], c_late [A];    // P2, registered
 logic [7:0]          c_c   [A];
 logic signed [KW-1:0] c_k  [A];
-logic                c_free[A];      // passed by the beam: may be reused
+logic                c_free[A];      // passed by the beam: may be reused (combinational)
+logic                p1_cov [A];
+logic [KW-1:0]       p1_k   [A];
+logic [LTW-1:0]      p1_boff[A];
 
-always_comb begin
+always_ff @(posedge clk) begin
     for (int s = 0; s < A; s++) begin
         logic signed [12:0] cxs, dx;
         logic [9:0]  u0, u;
         logic [21:0] bit_at;      // the texel's bit address in tex0
-        logic [KW-1:0] k;
-        logic [LTW-1:0] boff;
         logic        e;
         logic [TW-1:0] w;
+        logic [7:0]  c;
+        logic        late;
+        // P1
         cxs = $signed({3'b000, cx});
         dx  = cxs - sx[s];
         u0  = ssh[s] ? dx[10:1] : dx[9:0];
         u   = shf[s] ? (sW[s] - 10'd1 - u0) : u0;
         bit_at = {1'b0, srb[s], 3'b000} + (sb8[s] ? {9'd0, u, 3'b000} : {10'd0, u, 2'b00});
-        k    = KW'(bit_at >> LTW);
-        boff = bit_at[LTW-1:0];
-        e    = k[0];
+        p1_k[s]    <= KW'(bit_at >> LTW);
+        p1_boff[s] <= bit_at[LTW-1:0];
+        p1_cov[s]  <= sv[s] && frame_px && (sline[s] == cy[8:0]) && (dx >= 0) && (cxs < sxe[s]);
+        // P2
+        e    = p1_k[s][0];
         w    = sbuf[s][e];
-        c_k[s]   = $signed(k);
-        c_cov[s] = sv[s] && frame_px && (sline[s] == cy[8:0]) && (dx >= 0) && (cxs < sxe[s]);
-        c_c[s]   = sb8[s] ? w[boff +: 8] : {4'h0, w[boff +: 4]};
-        c_late[s] = c_cov[s] && !(sbv[s][e] && stag[s][e] == k);
-        c_opq[s]  = c_cov[s] && !c_late[s] && (c_c[s] != 8'h0);
+        c    = sb8[s] ? w[p1_boff[s] +: 8] : {4'h0, w[p1_boff[s] +: 4]};
+        late = p1_cov[s] && !(sbv[s][e] && stag[s][e] == p1_k[s]);
+        c_k[s]    <= $signed(p1_k[s]);
+        c_cov[s]  <= p1_cov[s];
+        c_c[s]    <= c;
+        c_late[s] <= late;
+        c_opq[s]  <= p1_cov[s] && !late && (c != 8'h0);
+    end
+end
+
+always_comb begin
+    for (int s = 0; s < A; s++) begin
+        logic signed [12:0] cxs;
+        cxs = $signed({3'b000, cx});
         // free once its line is over, or the beam is past its right edge (or the visible picture) on its line
         c_free[s] = sv[s] && !spend[s] && (est == E_RUN) &&
                     (($signed({2'b00, sline[s]}) < fl) ||
@@ -700,40 +721,46 @@ assign b_hwdata = '0;
 // ---------------------------------------------------------------------------------------------------------------------------
 // Slot state: load (admission), fetch issue and fill (bus tex), the beam (S0), free
 // ---------------------------------------------------------------------------------------------------------------------------
+// Only the control bits are reset (sv, spend, sbv): a slot's data is read only while sv (and a buffer word only while its sbv)
+// says so, and a reset of every slot register is a fan-out timing does not meet.
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         for (int s = 0; s < A; s++) begin
-            sv[s] <= 1'b0; sline[s] <= '0; sidx[s] <= '0; sprio[s] <= '0; spal[s] <= '0;
-            sb8[s] <= 1'b0; shb[s] <= 1'b0; shf[s] <= 1'b0; ssh[s] <= 1'b0;
-            sx[s] <= '0; sxe[s] <= '0; sW[s] <= '0; srb[s] <= '0; skfirst[s] <= '0; sklast[s] <= '0; skc[s] <= '0; skf[s] <= '0;
-            spend[s] <= 1'b0;
-            for (int e = 0; e < 2; e++) begin sbuf[s][e] <= '0; stag[s][e] <= '0; sbv[s][e] <= 1'b0; end
+            sv[s] <= 1'b0; spend[s] <= 1'b0; sbv[s][0] <= 1'b0; sbv[s][1] <= 1'b0;
         end
     end else begin
-        for (int s = 0; s < A; s++) begin
+        for (int s = 0; s < A; s++)
             if (c_free[s]) sv[s] <= 1'b0;
-            if (pix_stb && c_cov[s]) skc[s] <= c_k[s];
-        end
         if (adm_load) begin
-            sv[free_s] <= 1'b1;      sline[free_s] <= L;        sidx[free_s] <= ad_idx;
-            sprio[free_s] <= a_prio; spal[free_s] <= a_pal;      sb8[free_s] <= a_b8;   shb[free_s] <= a_hb;
-            shf[free_s] <= a_hf;     ssh[free_s] <= a_sh;        sx[free_s] <= a_x;     sxe[free_s] <= a_xe;
-            sW[free_s] <= a_W;       srb[free_s] <= a_rb;        skfirst[free_s] <= a_kfirst; sklast[free_s] <= a_klast;
-            skc[free_s] <= a_k0;     skf[free_s] <= a_k0;
-            sbv[free_s][0] <= 1'b0;  sbv[free_s][1] <= 1'b0;
+            sv[free_s] <= 1'b1; sbv[free_s][0] <= 1'b0; sbv[free_s][1] <= 1'b0;
         end
         if (b_issue_slot) begin
             spend[want_s] <= 1'b1;
             sbv[want_s][skf[want_s][0]] <= 1'b0;
-            skf[want_s] <= shf[want_s] ? skf[want_s] - 1 : skf[want_s] + 1;
         end
         // a new frame: every slot is free (a fetch still in flight lands in its buffer, tagged with its absolute word number,
         // so whatever sprite takes the slot next sees correct data or a tag that does not match)
         if (frame_wrap) for (int s = 0; s < A; s++) sv[s] <= 1'b0;
         if (b_fill) begin
-            spend[b_slot] <= 1'b0;
-            sbuf[b_slot][b_e] <= b_hrdata; stag[b_slot][b_e] <= b_k; sbv[b_slot][b_e] <= 1'b1;
+            spend[b_slot] <= 1'b0; sbv[b_slot][b_e] <= 1'b1;
         end
+    end
+end
+
+always_ff @(posedge clk) begin
+    for (int s = 0; s < A; s++)
+        if (pix_stb && c_cov[s]) skc[s] <= c_k[s];
+    if (adm_load) begin
+        sline[free_s] <= L;        sidx[free_s] <= ad_idx;
+        sprio[free_s] <= a_prio;   spal[free_s] <= a_pal;      sb8[free_s] <= a_b8;   shb[free_s] <= a_hb;
+        shf[free_s] <= a_hf;       ssh[free_s] <= a_sh;        sx[free_s] <= a_x;     sxe[free_s] <= a_xe;
+        sW[free_s] <= a_W;         srb[free_s] <= a_rb;        skfirst[free_s] <= a_kfirst; sklast[free_s] <= a_klast;
+        skc[free_s] <= a_k0;       skf[free_s] <= a_k0;
+    end
+    if (b_issue_slot)
+        skf[want_s] <= shf[want_s] ? skf[want_s] - 1 : skf[want_s] + 1;
+    if (b_fill) begin
+        sbuf[b_slot][b_e] <= b_hrdata; stag[b_slot][b_e] <= b_k;
     end
 end
 
@@ -741,7 +768,23 @@ end
 // Pixel pipeline, one step per pix_stb: S0 (slot texels, registered), S1 (priority, hitboxes), S2 (palette -> pixel)
 // ---------------------------------------------------------------------------------------------------------------------------
 // a pixel is safe from admission when every sprite that can cover it is in a slot: all of its line, or all bins up to its own
-wire adm_safe = ($signed({1'b0, cy}) <= adm_done_line) || (adm_active && (L == cy[8:0]) && ({1'b0, ad_b} > {1'b0, cx[9:4]}));
+// The frontier is taken 3 cycles late, as S0 sees the slots (P1, P2): a bin counts as done only once its sprites are visible there.
+logic signed [10:0] fr_done [3];
+logic               fr_act  [3];
+logic [8:0]         fr_L    [3];
+logic [5:0]         fr_b    [3];
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        for (int i = 0; i < 3; i++) begin fr_done[i] <= -11'sd1; fr_act[i] <= 1'b0; fr_L[i] <= '0; fr_b[i] <= '0; end
+    end else begin
+        fr_done[0] <= adm_done_line; fr_act[0] <= adm_active; fr_L[0] <= L; fr_b[0] <= ad_b;
+        for (int i = 1; i < 3; i++) begin
+            fr_done[i] <= fr_done[i-1]; fr_act[i] <= fr_act[i-1]; fr_L[i] <= fr_L[i-1]; fr_b[i] <= fr_b[i-1];
+        end
+    end
+end
+// in the same frame as the delayed values: at a frame wrap adm_done_line falls to -1, which only makes pixels less safe
+wire adm_safe = ($signed({1'b0, cy}) <= fr_done[2]) || (fr_act[2] && (fr_L[2] == cy[8:0]) && ({1'b0, fr_b[2]} > {1'b0, cx[9:4]}));
 
 logic        s0_v, s0_late;
 logic        s0_opq [A], s0_hb [A];
@@ -758,37 +801,57 @@ logic [127:0] hit_r;          // hits of the frame being drawn
 logic [127:0] hit_q;          // of the last finished frame (HIT0..3)
 logic [11:0] pixel_r;
 
-// S1, combinational: the opaque slot with the smallest (prio, index) wins; hitboxes when two or more opaque ones meet
-logic        w_any;
-logic [8:0]  w_key;
-logic [7:0]  w_pi;
-logic [7:0]  hb_count;
-always_comb begin
-    w_any = 1'b0; w_key = 9'h1FF; w_pi = 8'h00; hb_count = '0;
-    for (int s = 0; s < A; s++) begin
-        if (s0_opq[s] && (!w_any || {s0_prio[s], s0_idx[s]} < w_key)) begin   // not just < the start value: prio 3, index 127 is 9'h1FF
-            w_any = 1'b1;
-            w_key = {s0_prio[s], s0_idx[s]};
-            w_pi  = s0_b8[s] ? s0_c[s] : {s0_pal[s], s0_c[s][3:0]};
-        end
-        if (s0_opq[s] && s0_hb[s]) hb_count = hb_count + 8'd1;
+// S1: the opaque slot with the smallest (prio, index) wins; hitboxes when two or more opaque ones meet.
+// A tree of 4-way picks, one registered level a cycle (up to 64 slots in 3 levels), on the S0 registers, which hold for the
+// 4 cycles of a pixel: the result is there for the next pix_stb. A candidate is {opaque, prio, index, palette index}.
+localparam int N1 = (A + 3) / 4, N2 = (N1 + 3) / 4, N3 = (N2 + 3) / 4;
+typedef struct packed { logic v; logic [8:0] key; logic [7:0] pi; } cand_t;
+function automatic cand_t pick(cand_t a, cand_t b);    // b wins only when it is opaque and a is not, or its key is smaller
+    return (b.v && (!a.v || b.key < a.key)) ? b : a;
+endfunction
+cand_t lv0 [A];
+cand_t lv1 [N1], lv2 [N2], lv3 [N3];
+always_comb
+    for (int s = 0; s < A; s++)
+        lv0[s] = '{v: s0_opq[s], key: {s0_prio[s], s0_idx[s]}, pi: s0_b8[s] ? s0_c[s] : {s0_pal[s], s0_c[s][3:0]}};
+always_ff @(posedge clk) begin
+    for (int i = 0; i < N1; i++) begin
+        cand_t c; c = '0;
+        for (int j = 4 * i; j < 4 * i + 4; j++) if (j < A) c = pick(c, lv0[j]);
+        lv1[i] <= c;
     end
+    for (int i = 0; i < N2; i++) begin
+        cand_t c; c = '0;
+        for (int j = 4 * i; j < 4 * i + 4; j++) if (j < N1) c = pick(c, lv1[j]);
+        lv2[i] <= c;
+    end
+    for (int i = 0; i < N3; i++) begin
+        cand_t c; c = '0;
+        for (int j = 4 * i; j < 4 * i + 4; j++) if (j < N2) c = pick(c, lv2[j]);
+        lv3[i] <= c;
+    end
+end
+wire       w_any = lv3[0].v;
+wire [7:0] w_pi  = lv3[0].pi;
+// two or more opaque hitbox sprites on the pixel, registered like the tree
+logic hb_multi;
+always_ff @(posedge clk) begin
+    logic [7:0] n; n = '0;
+    for (int s = 0; s < A; s++) n = n + 8'(s0_opq[s] && s0_hb[s]);
+    hb_multi <= (n >= 8'd2);
 end
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         s0_v <= 1'b0; s0_late <= 1'b0; s1_v <= 1'b0; s1_late <= 1'b0; s1_pi <= '0;
         late_r <= '0; hit_r <= '0; hit_q <= '0; pixel_r <= '0;
-        for (int s = 0; s < A; s++) begin
-            s0_opq[s] <= 1'b0; s0_hb[s] <= 1'b0; s0_c[s] <= '0; s0_idx[s] <= '0; s0_prio[s] <= '0; s0_pal[s] <= '0; s0_b8[s] <= 1'b0;
-        end
+        for (int s = 0; s < A; s++) s0_opq[s] <= 1'b0;
     end else if (pix_stb) begin
         // S0
         s0_v <= frame_px;
         s0_late <= 1'b0;
         for (int s = 0; s < A; s++) begin
-            s0_opq[s] <= c_opq[s]; s0_hb[s] <= shb[s]; s0_c[s] <= c_c[s];
-            s0_idx[s] <= sidx[s];  s0_prio[s] <= sprio[s]; s0_pal[s] <= spal[s]; s0_b8[s] <= sb8[s];
+            s0_opq[s] <= c_opq[s];
             if (c_late[s]) s0_late <= 1'b1;
         end
         if (frame_px && !adm_safe) s0_late <= 1'b1;
@@ -798,13 +861,19 @@ always_ff @(posedge clk or negedge rst_n) begin
         s1_pi   <= w_any ? w_pi : 8'h00;      // nothing opaque: the backdrop, palette[0]
         if (s0_v && s0_late && late_r != 32'hFFFF_FFFF) late_r <= late_r + 32'd1;
         if (hit_latch) begin hit_q <= hit_r; hit_r <= '0; end   // no pixel of a frame is in S1 then: it is the blanking
-        if (s0_v && hb_count >= 8'd2)
+        if (s0_v && hb_multi)
             for (int s = 0; s < A; s++)
                 if (s0_opq[s] && s0_hb[s]) hit_r[s0_idx[s]] <= 1'b1;
         // S2: a late pixel is black (spec section 8)
         pixel_r <= (s1_v && !s1_late) ? pal_mem[s1_pi] : 12'h000;
     end
 end
+
+always_ff @(posedge clk)
+    if (pix_stb)
+        for (int s = 0; s < A; s++) begin
+            s0_hb[s] <= shb[s]; s0_c[s] <= c_c[s]; s0_idx[s] <= sidx[s]; s0_prio[s] <= sprio[s]; s0_pal[s] <= spal[s]; s0_b8[s] <= sb8[s];
+        end
 
 assign pixel      = pixel_r;
 assign late_count = late_r;
