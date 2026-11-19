@@ -7,7 +7,8 @@
 //   cohesion    steer toward the neighbours' centre
 // then the speed is held between MIN_SPEED and MAX_SPEED. All in fixed point (1/256 pixel): the core has no FPU, and the
 // all-pairs loop (96 x 95 checks, about a quarter of a frame's cycles) is left plain on purpose, to show the headroom.
-// On screen: MISSED, the frames the program was not done in time (showcase_status.missed); also on the LEDs.
+// On screen: MISSED, the frames the program was not done in time (showcase_status.missed); also on the LEDs. LATE PX, the
+// pixels the render unit was late for in the last finished frame (shown black); LATE FR, the frames with any late pixel.
 // No controls.
 #include "ppu.h"
 
@@ -19,11 +20,12 @@
 #define W          (640 * 256)
 #define H          (480 * 256)
 
-enum { S_BOID = 0, S_TEXT = 100, S_BG = 127 };
+enum { S_BOID = 0, S_TEXT = 96, S_BG = 127 };   // text: 31 sprites, 96..126
 enum { P_SKY = 0, P_BOID = 1, P_TEXT = 4 };   // P_BOID .. P_BOID+2: three colours of boid
 
 static int32_t bx[N], by[N], bvx[N], bvy[N];   // position and velocity, 1/256 pixel
 static int32_t nvx[N], nvy[N];                 // the next velocities (all boids see the same frame)
+static uint32_t late_seen, late_px, late_fr;     // STATUS.LATE at the last frame, its step, frames with a step
 
 // ---- 16 headings from 5 textures and the flips ----
 // Heading d is d * 22.5 degrees, 0 = right, clockwise on the screen (y grows down). Textures exist for 0, 22.5, 45, 67.5 and
@@ -117,9 +119,12 @@ static void draw(void)
         heading_sprite(heading(bvx[i], bvy[i]), &base, &flags);
         spr(S_BOID + i, (bx[i] >> 8) - 8, (by[i] >> 8) - 8, t_dart[base], P_BOID + i % 3, 1, flags);
     }
-    int s = text(S_TEXT, 24, 20, "BOIDS 96", P_TEXT, 0);
-    s = text(s, 24, 44, "MISSED", P_TEXT, 0);
-    text_number(s, 24 + 7 * 8, 44, showcase_status.missed, 4, P_TEXT, 0);
+    int s = text(S_TEXT, 24, 20, "MISSED", P_TEXT, 0);                   // 10 sprites
+    s = text_number(s, 24 + 8 * 8, 20, showcase_status.missed, 4, P_TEXT, 0);
+    s = text(s, 24, 44, "LATE PX", P_TEXT, 0);                           // 11
+    s = text_number(s, 24 + 8 * 8, 44, late_px, 5, P_TEXT, 0);
+    s = text(s, 24, 68, "LATE FR", P_TEXT, 0);                           // 10
+    text_number(s, 24 + 8 * 8, 68, late_fr, 4, P_TEXT, 0);
     spr(S_BG, 0, 0, t_sky, P_SKY, 3, SPR_GIANT);
 }
 
@@ -169,6 +174,10 @@ int main(void)
     ppu_start(GIANT_SIZE(320, 240, 1));
     for (;;) {
         ppu_wait_frame();
+        late_px = showcase_status.late - late_seen;
+        late_seen = showcase_status.late;
+        if (late_px)
+            late_fr++;
         flock();
         draw();
         ppu_present();
