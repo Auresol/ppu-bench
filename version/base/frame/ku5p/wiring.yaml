@@ -1,0 +1,7 @@
+# How the chip uses the ku5p frame: no board pin reaches the chip's gpio, so there is no wiring: section. The named pins of the chip
+# (clocks: and reset: in system.yaml) are driven by the shell's outputs.
+named:
+  clk: shell.clk        # the board's 100 MHz oscillator through an MMCM, 50 MHz
+  porb: shell.rst_n     # active low, a power-on count after the MMCM locks, released synchronously
+external:
+  link: {vga: racer0, phy: rgmii}

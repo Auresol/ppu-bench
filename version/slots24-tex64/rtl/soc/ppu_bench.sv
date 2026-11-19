@@ -1,5 +1,10 @@
 // hw-proj: GENERATE HEADER BEGIN
 module ppu_bench (
+    // Taps of the host link (adr/host-link/): internal signals for the FPGA frame's link device; only the filelist of a frame with a link: entry defines HWPROJ_TAP
+`ifdef HWPROJ_TAP
+    output wire tap_racer0_pix_stb,
+`endif
+
     // named pins of the clock and reset sources, from clocks: and reset: of system.yaml
     input  wire clk,
     input  wire porb,
@@ -598,6 +603,11 @@ module ppu_bench (
         .s_tex0_hready(s_tex0_hready),
         .s_tex0_hresp(s_tex0_hresp)
     );
+
+    // Taps of the host link, under ifdef HWPROJ_TAP
+`ifdef HWPROJ_TAP
+    assign tap_racer0_pix_stb = racer0_pix_stb;
+`endif
 
     // hw-proj: GENERATE END
 

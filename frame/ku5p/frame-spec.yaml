@@ -1,0 +1,10 @@
+# The XCKU5P board (Kintex UltraScale+, package ffvb676; the speed grade is unread, so -1, the slowest: timing that holds at -1 holds on any
+# grade). The bitstream loads over JTAG (openFPGALoader -c digilent_hs2, IDCODE 0x04a62093; a load finishes about 1 in 4, so retry: board-job
+# does). The shell makes the chip's 50 MHz clock (an MMCM on the board's 100 MHz oscillator) and its reset (a power-on count).
+kind: fpga
+part: xcku5p-ffvb676-1-e
+xdc: [frame/ku5p/ku5p.xdc]
+shell:
+  file: frame/ku5p/ku5p_shell.sv
+  module: ku5p_shell
+  xdc: [frame/ku5p/ku5p_shell.xdc]
