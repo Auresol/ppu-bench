@@ -126,10 +126,14 @@ volatile struct ppu_status showcase_status;
 
 void ppu_wait_frame(void)
 {
-    // a frame that finished before we came back is one the program missed: its sprite table was the old one again
+    // a frame that finished before we came back is one the program missed: its sprite table was the old one again. The
+    // frame on screen now latched the old bank too, and the program's next writes go to that bank: wait for that frame to
+    // finish as well, so they never land in the bank the beam is reading (that tore the lower part of the screen)
     uint32_t now = PPU0_FRAME;
-    if (now != last_frame)
+    if (now != last_frame) {
         showcase_status.missed += now - last_frame;
+        last_frame = now;
+    }
     while (PPU0_FRAME == last_frame)
         ;
     last_frame = PPU0_FRAME;
